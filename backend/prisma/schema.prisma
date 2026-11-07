@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  user_id           Int                  @id @default(autoincrement())
+  nama              String               @db.VarChar(100)
+  email             String               @unique @db.VarChar(100)
+  password          String               @db.VarChar(255)
+  role              Role
+  no_wa             String?              @db.VarChar(20)
+  status_verifikasi StatusVerifikasiUser @default(Menunggu)
+  bookings          Booking[]
+  kos               Kos[]
+
+  @@map("users")
+}
+
+model Kos {
+  kos_id            Int            @id @default(autoincrement())
+  owner_id          Int
+  nama_kos          String         @db.VarChar(100)
+  alamat            String
+  kota              String         @db.VarChar(100)
+  latitude          Decimal        @db.Decimal(10, 7)
+  longitude         Decimal        @db.Decimal(10, 7)
+  tipe_kos          TipeKos
+  status_verifikasi StatusKos      @default(Menunggu)
+  foto              FotoKos[]
+  kamar             Kamar[]
+  owner             User           @relation(fields: [owner_id], references: [user_id], onDelete: Cascade)
+  fasilitas         KosFasilitas[]
+
+  @@index([owner_id])
+  @@index([latitude, longitude])
+  @@index([status_verifikasi])
+  @@index([kota])
+  @@map("kos")
+}
+
+model FotoKos {
+  foto_id   Int    @id @default(autoincrement())
+  kos_id    Int
+  path_foto String @db.VarChar(255)
+  kos       Kos    @relation(fields: [kos_id], references: [kos_id], onDelete: Cascade)
+
+  @@map("foto_kos")
+}
+
+model Fasilitas {
+  fasilitas_id   Int            @id @default(autoincrement())
+  nama_fasilitas String         @unique @db.VarChar(100)
+  kos            KosFasilitas[]
+
+  @@map("fasilitas")
+}
+
+model KosFasilitas {
+  kos_id       Int
+  fasilitas_id Int
+  fasilitas    Fasilitas @relation(fields: [fasilitas_id], references: [fasilitas_id], onDelete: Cascade)
+  kos          Kos       @relation(fields: [kos_id], references: [kos_id], onDelete: Cascade)
+
+  @@id([kos_id, fasilitas_id])
+  @@map("kos_fasilitas")
+}
+
+model Kamar {
+  kamar_id     Int         @id @default(autoincrement())
+  kos_id       Int
+  no_kamar     String      @db.VarChar(20)
+  tipe_kamar   String      @db.VarChar(50)
+  harga        Int
+  status_kamar StatusKamar @default(Kosong)
+  bookings     Booking[]
+  kos          Kos         @relation(fields: [kos_id], references: [kos_id], onDelete: Cascade)
+
+  @@unique([kos_id, no_kamar])
+  @@index([kos_id])
+  @@index([status_kamar])
+  @@map("kamar")
+}
+
+model Booking {
+  booking_id     Int           @id @default(autoincrement())
+  kamar_id       Int
+  user_id        Int
+  jenis_booking  JenisBooking  @default(Survey)
+  tanggal_survey DateTime      @db.Date
+  durasi_bulan   Int           @default(1)
+  status_booking StatusBooking @default(Menunggu)
+  dibuat_pada    DateTime      @default(now())
+  kamar          Kamar         @relation(fields: [kamar_id], references: [kamar_id], onDelete: Cascade)
+  user           User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  review         Review?
+
+  @@index([kamar_id])
+  @@index([user_id])
+  @@index([status_booking])
+  @@map("booking")
+}
+
+model Review {
+  review_id   Int      @id @default(autoincrement())
+  booking_id  Int      @unique
+  rating      Int
+  komentar    String?
+  dibuat_pada DateTime @default(now())
+  booking     Booking  @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+
+  @@map("review")
+}
+
+enum Role {
+  Admin
+  Owner
+  User
+}
+
+enum StatusVerifikasiUser {
+  Menunggu
+  Terverifikasi
+}
+
+enum TipeKos {
+  Putra
+  Putri
+  Campur
+}
+
+enum StatusKos {
+  Menunggu
+  Aktif
+  Nonaktif
+}
+
+enum StatusKamar {
+  Kosong
+  DalamBooking @map("Dalam Booking")
+  Terisi
+}
+
+enum StatusBooking {
+  Menunggu
+  Disetujui
+  Ditolak
+  Selesai
+}
+
+enum JenisBooking {
+  Survey
+  Kamar
+}
