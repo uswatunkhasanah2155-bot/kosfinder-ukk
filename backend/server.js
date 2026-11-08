@@ -6,6 +6,9 @@ import fasilitasRoutes from './services/fasilitas-service/fasilitas.js';
 import adminRoutes from './services/admin-service/admin.js';
 import kosRoutes from './services/kos-service/kos.js';
 import kamarRoutes from './services/kamar-service/kamar.js';
+import bookingRoutes from './services/booking-service/booking.js';
+import reviewRoutes from './services/review-service/review.js';
+import dashboardRoutes from './services/dashboard-service/dashboard.js';
 dotenv.config();
 
 const app = express();
@@ -34,6 +37,15 @@ app.use('/api/kos', kosRoutes);
 
 //Route Kamar
 app.use('/api', kamarRoutes);
+
+//Route Booking
+app.use('/api', bookingRoutes);
+
+//Route Review
+app.use('/api', reviewRoutes);
+
+//Route Dashboard
+app.use('/api', dashboardRoutes);
 
 // Route uji coba utama
 app.get('/', (req, res) => {
