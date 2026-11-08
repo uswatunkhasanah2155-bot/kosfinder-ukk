@@ -1,6 +1,8 @@
+
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+
 import authRoutes from './services/auth-service/auth.js';
 import fasilitasRoutes from './services/fasilitas-service/fasilitas.js';
 import adminRoutes from './services/admin-service/admin.js';
@@ -9,6 +11,10 @@ import kamarRoutes from './services/kamar-service/kamar.js';
 import bookingRoutes from './services/booking-service/booking.js';
 import reviewRoutes from './services/review-service/review.js';
 import dashboardRoutes from './services/dashboard-service/dashboard.js';
+import exportRoutes from './services/export-service/export.js';
+
+import { selesaikanBookingKedaluwarsa } from './lib/bookingOtomatis.js';
+
 dotenv.config();
 
 const app = express();
@@ -35,17 +41,20 @@ app.use('/api/admin', adminRoutes);
 // Route Kos
 app.use('/api/kos', kosRoutes);
 
-//Route Kamar
+// Route Kamar
 app.use('/api', kamarRoutes);
 
-//Route Booking
+// Route Booking
 app.use('/api', bookingRoutes);
 
-//Route Review
+// Route Review
 app.use('/api', reviewRoutes);
 
-//Route Dashboard
+// Route Dashboard
 app.use('/api', dashboardRoutes);
+
+// Route Export
+app.use('/api', exportRoutes);
 
 // Route uji coba utama
 app.get('/', (req, res) => {
@@ -57,10 +66,21 @@ app.get('/', (req, res) => {
 
 // Route tidak ditemukan
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Endpoint tidak ditemukan' });
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint tidak ditemukan',
+  });
 });
 
 // Jalankan server
 app.listen(PORT, () => {
   console.log(`Server aktif di http://localhost:${PORT}`);
+
+  // Jalankan otomatisasi saat server aktif
+  selesaikanBookingKedaluwarsa();
+
+  // Periksa booking setiap 10 menit
+  setInterval(() => {
+    selesaikanBookingKedaluwarsa();
+  }, 10 * 60 * 1000);
 });
