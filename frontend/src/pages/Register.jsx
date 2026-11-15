@@ -61,7 +61,7 @@ export default function Register() {
 
   return (
     <AuthLayout judul="Buat akun" subjudul="Pilih peranmu, lalu isi data diri.">
-      <form className="grid gap-[18px]" onSubmit={kirim}>
+      <form className="grid gap-4.5" onSubmit={kirim}>
         {error && <p className={kelas.galat} role="alert">{error}</p>}
 
         <div>

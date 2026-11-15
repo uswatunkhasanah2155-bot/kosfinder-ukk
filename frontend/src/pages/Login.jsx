@@ -30,7 +30,7 @@ export default function Login() {
 
   return (
     <AuthLayout judul="Masuk" subjudul="Masuk untuk mencari kos, mengelola kos, atau memverifikasi pemilik.">
-      <form className="grid gap-[18px]" onSubmit={kirim}>
+      <form className="grid gap-4.5" onSubmit={kirim}>
         {error && <p className={kelas.galat} role="alert">{error}</p>}
 
         <div>

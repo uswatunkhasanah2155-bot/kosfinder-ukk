@@ -13,7 +13,7 @@ export const kelas = {
 export default function AuthLayout({ judul, subjudul, children }) {
   return (
     <main className="grid min-h-screen w-full grid-cols-1 bg-[#f6f8f6] text-left font-['Plus_Jakarta_Sans',system-ui,sans-serif] text-[#12302e] md:grid-cols-[5fr_6fr]">
-      <aside className="relative min-h-[150px] overflow-hidden bg-[#0d5a57] text-white md:min-h-screen">
+      <aside className="relative min-h-37.5 overflow-hidden bg-[#0d5a57] text-white md:min-h-screen">
         <svg
           className="absolute inset-0 h-full w-full opacity-[0.35] md:opacity-100"
           viewBox="0 0 400 520"
@@ -48,7 +48,7 @@ export default function AuthLayout({ judul, subjudul, children }) {
         </div>
       </aside>
 
-      <section className="mx-auto w-full max-w-[440px] px-6 pb-12 pt-8 md:self-center md:p-12">
+      <section className="mx-auto w-full max-w-110 px-6 pb-12 pt-8 md:self-center md:p-12">
         <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-tight">{judul}</h1>
         <p className="mb-7 mt-2 leading-relaxed text-[#4b625f]">{subjudul}</p>
         {children}
