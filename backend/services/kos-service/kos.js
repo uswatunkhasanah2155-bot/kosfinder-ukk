@@ -480,7 +480,8 @@ router.patch('/:id/status', ownerTerverifikasi, (req, res) => ubahStatusKos(req,
 
 // ===============================
 // HAPUS KOS (Owner pemilik)
-// Ditolak jika masih ada booking Menunggu / Disetujui
+// Ditolak jika kos sudah punya riwayat booking (status apa pun), supaya data
+// booking, review, dan pendapatan tidak ikut hilang. Gunakan status Nonaktif sebagai gantinya.
 // ===============================
 router.delete('/:id', ownerTerverifikasi, async (req, res) => {
   try {
@@ -492,16 +493,13 @@ router.delete('/:id', ownerTerverifikasi, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    const bookingAktif = await prisma.booking.count({
-      where: {
-        kamar: { kos_id: id },
-        status_booking: { in: ['Menunggu', 'Disetujui'] },
-      },
+    const riwayatBooking = await prisma.booking.count({
+      where: { kamar: { kos_id: id } },
     });
-    if (bookingAktif > 0) {
+    if (riwayatBooking > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Kos tidak bisa dihapus karena masih ada booking yang berjalan',
+        message: 'Kos tidak bisa dihapus karena sudah memiliki riwayat booking. Nonaktifkan kos jika tidak ingin ditampilkan lagi',
       });
     }
 

@@ -1,4 +1,3 @@
-
 import express from 'express';
 import prisma from '../../lib/prisma.js';
 import { verifyToken, checkRole } from '../../middleware/authMiddleware.js';
@@ -195,6 +194,18 @@ router.delete('/:id', verifyToken, checkRole('Admin'), async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Fasilitas tidak ditemukan',
+      });
+    }
+
+    // Tolak jika masih dipakai kos, supaya fasilitas tidak hilang diam-diam dari data kos
+    const dipakai = await prisma.kosFasilitas.count({
+      where: { fasilitas_id: id },
+    });
+
+    if (dipakai > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Fasilitas masih dipakai oleh ${dipakai} kos`,
       });
     }
 

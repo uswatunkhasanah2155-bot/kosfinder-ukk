@@ -15,7 +15,8 @@ export const verifyToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({
+      // 401 (bukan 403) agar frontend bisa otomatis mengarahkan ke halaman login
+      return res.status(401).json({
         success: false,
         message: 'Token tidak valid atau sudah kadaluarsa',
       });
