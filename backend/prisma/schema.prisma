@@ -124,6 +124,7 @@ enum Role {
 enum StatusVerifikasiUser {
   Menunggu
   Terverifikasi
+  Ditolak
 }
 
 enum TipeKos {

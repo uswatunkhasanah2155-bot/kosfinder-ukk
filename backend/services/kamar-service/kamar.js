@@ -72,6 +72,14 @@ const adaBookingBerjalan = async (kamarId) => {
   return jumlah > 0;
 };
 
+// Status kamar diatur sistem hanya selama ada booking Kamar yang sudah Disetujui
+const adaBookingKamarDisetujui = async (kamarId) => {
+  const jumlah = await prisma.booking.count({
+    where: { kamar_id: kamarId, jenis_booking: 'Kamar', status_booking: 'Disetujui' },
+  });
+  return jumlah > 0;
+};
+
 // ===============================
 // DAFTAR KAMAR PER KOS (publik, hanya kos Aktif)
 // Query opsional: status=Kosong|DalamBooking|Terisi
@@ -178,15 +186,15 @@ router.put('/kamar/:id', ownerTerverifikasi, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tidak ada data yang diubah' });
     }
 
-    // Selama ada booking berjalan, status ditentukan oleh alur booking, bukan manual
+    // Selama ada booking Kamar yang disetujui, status ditentukan oleh alur booking, bukan manual
     if (
       data.status_kamar !== undefined &&
       data.status_kamar !== kamarLama.status_kamar &&
-      (await adaBookingBerjalan(id))
+      (await adaBookingKamarDisetujui(id))
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Status kamar tidak bisa diubah manual karena masih ada booking yang berjalan',
+        message: 'Status kamar tidak bisa diubah manual karena ada booking yang sudah disetujui',
       });
     }
 
