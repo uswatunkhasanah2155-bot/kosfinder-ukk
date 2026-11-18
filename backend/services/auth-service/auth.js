@@ -8,6 +8,20 @@ const router = express.Router();
 
 const emailValid = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
+// Batas panjang input, sama dengan panjang kolom di database (users)
+const MAKS_EMAIL = 100;
+const MAKS_NAMA = 100;
+const MAKS_WA = 20;
+const MAKS_PASSWORD_LOGIN = 128;
+
+// Password minimal 8 karakter, harus mengandung huruf, angka, dan simbol
+const passwordKuat = (p) =>
+  typeof p === 'string' &&
+  p.length >= 8 &&
+  /[A-Za-z]/.test(p) &&
+  /\d/.test(p) &&
+  /[^A-Za-z0-9\s]/.test(p);
+
 // Data user yang aman dikirim ke frontend (tanpa password)
 const publicUser = (u) => ({
   user_id: u.user_id,
@@ -32,19 +46,39 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (!emailValid(email)) {
+    if (typeof nama !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ success: false, message: 'Data yang dikirim tidak valid' });
+    }
+
+    // Email dirapikan dulu supaya spasi di awal/akhir tidak membuat format dianggap salah
+    const emailBersih = email.trim().toLowerCase();
+
+    if (!emailValid(emailBersih)) {
       return res.status(400).json({ success: false, message: 'Format email tidak valid' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
+    if (emailBersih.length > MAKS_EMAIL) {
+      return res.status(400).json({ success: false, message: `Email maksimal ${MAKS_EMAIL} karakter` });
+    }
+
+    if (nama.trim().length > MAKS_NAMA) {
+      return res.status(400).json({ success: false, message: `Nama maksimal ${MAKS_NAMA} karakter` });
+    }
+
+    if (no_wa && String(no_wa).trim().length > MAKS_WA) {
+      return res.status(400).json({ success: false, message: `Nomor WhatsApp maksimal ${MAKS_WA} karakter` });
+    }
+
+    if (!passwordKuat(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password minimal 8 karakter dan harus mengandung huruf, angka, dan simbol',
+      });
     }
 
     if (!['User', 'Owner'].includes(role)) {
       return res.status(400).json({ success: false, message: 'Role harus User atau Owner' });
     }
-
-    const emailBersih = email.trim().toLowerCase();
 
     const sudahAda = await prisma.user.findUnique({ where: { email: emailBersih } });
     if (sudahAda) {
@@ -57,7 +91,7 @@ router.post('/register', async (req, res) => {
         email: emailBersih,
         password: await bcrypt.hash(password, 10),
         role,
-        no_wa: no_wa || null,
+        no_wa: no_wa ? String(no_wa).trim() : null,
         // Pencari kos langsung terverifikasi; pemilik kos menunggu verifikasi Admin
         status_verifikasi: role === 'Owner' ? 'Menunggu' : 'Terverifikasi',
       },
@@ -74,11 +108,51 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     console.error('ERROR REGISTER:', error);
 
+    // Dua permintaan dengan email sama yang masuk bersamaan: yang kedua ditolak oleh database
+    if (error.code === 'P2002') {
+      return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Registrasi gagal',
-      error: error.message,
     });
+  }
+});
+
+// ===============================
+// CEK KETERSEDIAAN EMAIL (publik)
+// GET /cek-email?email=... -> { tersedia: true | false }
+// Dipakai form daftar untuk memberi tahu lebih awal jika email sudah terpakai
+// ===============================
+router.get('/cek-email', async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Email wajib diisi' });
+    }
+
+    const emailBersih = email.trim().toLowerCase();
+
+    if (!emailValid(emailBersih) || emailBersih.length > MAKS_EMAIL) {
+      return res.status(400).json({ success: false, message: 'Format email tidak valid' });
+    }
+
+    const ada = await prisma.user.findUnique({
+      where: { email: emailBersih },
+      select: { user_id: true },
+    });
+
+    res.json({
+      success: true,
+      message: ada ? 'Email sudah terdaftar' : 'Email tersedia',
+      tersedia: !ada,
+    });
+  } catch (error) {
+    console.error('ERROR CEK EMAIL:', error);
+
+    res.status(500).json({ success: false, message: 'Gagal memeriksa email' });
   }
 });
 
@@ -93,8 +167,19 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
     }
 
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
+    }
+
+    const emailBersih = email.trim().toLowerCase();
+
+    // Input yang panjangnya tidak masuk akal tidak perlu dicek ke database
+    if (emailBersih.length > MAKS_EMAIL || password.length > MAKS_PASSWORD_LOGIN) {
+      return res.status(401).json({ success: false, message: 'Email atau password salah' });
+    }
+
     const user = await prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+      where: { email: emailBersih },
     });
 
     // Pesan sengaja dibuat sama agar tidak membocorkan email mana yang terdaftar
@@ -120,7 +205,6 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Login gagal',
-      error: error.message,
     });
   }
 });
@@ -147,7 +231,6 @@ router.get('/me', verifyToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Gagal mengambil data user',
-      error: error.message,
     });
   }
 });
