@@ -1,229 +1,251 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
 
-export default function VerifikasiOwner() {
-  const [owners, setOwners] = useState([]);
-  const [cari, setCari] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [memprosesId, setMemprosesId] = useState(null);
-  const [pesan, setPesan] = useState({ tipe: '', teks: '' });
+// GET   /api/admin/owners?status=Menunggu|Terverifikasi|Ditolak
+// PATCH /api/admin/owners/:id/verifikasi
+// PATCH /api/admin/owners/:id/tolak
+const URL_OWNER = '/admin/owners';
 
-  const ambilDaftarOwner = () => {
+const TAB = [
+  {
+    kunci: 'Menunggu',
+    judul: 'Menunggu',
+    kosong: 'Tidak ada Owner yang menunggu verifikasi',
+    petunjuk: 'Akun Owner baru akan muncul di sini setelah mendaftar.',
+  },
+  {
+    kunci: 'Terverifikasi',
+    judul: 'Terverifikasi',
+    kosong: 'Belum ada Owner yang terverifikasi',
+    petunjuk: 'Owner yang sudah Anda verifikasi akan tampil di sini.',
+  },
+  {
+    kunci: 'Ditolak',
+    judul: 'Ditolak',
+    kosong: 'Tidak ada Owner yang ditolak',
+    petunjuk: 'Owner yang pendaftarannya ditolak akan tampil di sini.',
+  },
+];
+
+const gayaStatus = {
+  Menunggu: 'border-slate-300 bg-slate-100 text-slate-700',
+  Terverifikasi: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  Ditolak: 'border-red-300 bg-red-50 text-red-800',
+};
+
+const inisial = (nama = '') =>
+  nama
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((k) => k[0]?.toUpperCase())
+    .join('') || '?';
+
+export default function VerifikasiOwner() {
+  const [tab, setTab] = useState('Menunggu');
+  const [owners, setOwners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [prosesId, setProsesId] = useState(null);
+
+  // Muat ulang daftar setiap tab berganti
+  useEffect(() => {
+    let batal = false;
+
     setLoading(true);
+    setError('');
     api
-      .get('/admin/owners/menunggu')
-      .then((res) => setOwners(res.data.data || []))
-      .catch((err) =>
-        setPesan({
-          tipe: 'error',
-          teks: err.response?.data?.message || 'Gagal memuat daftar owner',
-        })
-      )
-      .finally(() => setLoading(false));
+      .get(URL_OWNER, { params: { status: tab } })
+      .then((res) => {
+        if (!batal) setOwners(res.data.data);
+      })
+      .catch((err) => {
+        if (!batal) setError(err.response?.data?.message || 'Gagal memuat daftar Owner');
+      })
+      .finally(() => {
+        if (!batal) setLoading(false);
+      });
+
+    return () => {
+      batal = true;
+    };
+  }, [tab]);
+
+  const gantiTab = (kunci) => {
+    if (kunci === tab) return;
+    setPesan('');
+    setOwners([]);
+    setTab(kunci);
   };
 
-  useEffect(() => {
-    ambilDaftarOwner();
-  }, []);
+  // jenis: 'verifikasi' | 'tolak'
+  const proses = async (owner, jenis) => {
+    const tanya =
+      jenis === 'tolak'
+        ? `Tolak pendaftaran Owner "${owner.nama}"?`
+        : `Verifikasi akun Owner "${owner.nama}"?`;
+    if (!window.confirm(tanya)) return;
 
-  const handleVerifikasi = async (owner) => {
-    const setuju = window.confirm(
-      `Verifikasi akun pemilik kos "${owner.nama}" (${owner.email})?`
-    );
-    if (!setuju) return;
-
-    setMemprosesId(owner.user_id);
-    setPesan({ tipe: '', teks: '' });
-
+    setProsesId(owner.user_id);
+    setPesan('');
+    setError('');
     try {
-      const res = await api.patch(`/admin/owners/${owner.user_id}/verifikasi`);
-      setOwners((prev) => prev.filter((item) => item.user_id !== owner.user_id));
-      setPesan({
-        tipe: 'sukses',
-        teks: res.data?.message || `Akun ${owner.nama} berhasil diverifikasi.`,
-      });
+      const res = await api.patch(`${URL_OWNER}/${owner.user_id}/${jenis}`);
+      setOwners((daftar) => daftar.filter((o) => o.user_id !== owner.user_id));
+      setPesan(res.data.message);
     } catch (err) {
-      setPesan({
-        tipe: 'error',
-        teks: err.response?.data?.message || 'Gagal memverifikasi akun owner',
-      });
+      setError(err.response?.data?.message || 'Gagal memproses Owner');
     } finally {
-      setMemprosesId(null);
+      setProsesId(null);
     }
   };
 
-  const ownerTersaring = owners.filter(
-    (o) =>
-      o.nama.toLowerCase().includes(cari.toLowerCase()) ||
-      o.email.toLowerCase().includes(cari.toLowerCase())
-  );
+  const tabAktif = TAB.find((t) => t.kunci === tab);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-      {/* HEADER */}
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-end">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#0d5a57]" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#0d5a57]">
-              Manajemen Pengguna
+    <div className="min-h-screen bg-slate-50/70 p-6 md:p-10">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* HEADER */}
+        <div className="border-b border-slate-200/85 pb-6">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+            <span className="text-sm font-bold uppercase tracking-wider text-emerald-700">
+              Manajemen Akun
             </span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#12302e] md:text-3xl">
-            Verifikasi Akun Pemilik Kos
-          </h1>
-          <p className="mt-1 text-sm text-[#4b625f]">
-            Setujui pendaftaran pemilik kos baru agar mereka dapat menambahkan dan mempublikasikan data kos.
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
+            Verifikasi Owner
+          </h2>
+          <p className="mt-1.5 text-base text-slate-900">
+            Owner baru harus diverifikasi terlebih dahulu sebelum dapat menambahkan dan menayangkan kos.
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-[#12302e] shadow-sm sm:self-auto">
-          <span>Menunggu Verifikasi:</span>
-          <span className="rounded-md bg-[#0d5a57] px-2 py-0.5 text-white">
-            {owners.length}
-          </span>
-        </div>
-      </div>
-
-      {/* NOTIFIKASI */}
-      {pesan.teks && (
-        <div
-          className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium ${
-            pesan.tipe === 'sukses'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border-[#f3c4c0] bg-[#fdecea] text-[#b3261e]'
-          }`}
-        >
-          <span>{pesan.teks}</span>
-          <button
-            onClick={() => setPesan({ tipe: '', teks: '' })}
-            className="ml-4 text-xs font-bold opacity-70 hover:opacity-100"
-          >
-            Tutup
-          </button>
-        </div>
-      )}
-
-      {/* KONTEN UTAMA */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        {/* Toolbar Pencarian */}
-        <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:max-w-xs">
-            <input
-              type="text"
-              value={cari}
-              onChange={(e) => setCari(e.target.value)}
-              placeholder="Cari nama atau email owner..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-9 pr-3.5 text-sm text-[#12302e] transition focus:border-[#0d5a57] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#0d5a57]/10"
-            />
-            <svg
-              className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.5 10.5a7.5 7.5 0 0013.15 6.15z"
-              />
-            </svg>
+        {/* NOTIFIKASI */}
+        {pesan && (
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5 text-base font-medium text-emerald-900 shadow-sm">
+            {pesan}
           </div>
-
-          <button
-            onClick={ambilDaftarOwner}
-            className="inline-flex items-center gap-1.5 self-start rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-[#12302e] sm:self-auto"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Muat Ulang
-          </button>
-        </div>
-
-        {/* Tabel / State */}
-        {loading ? (
-          <div className="space-y-3 p-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
-            ))}
+        )}
+        {error && (
+          <div className="rounded-2xl border border-slate-300 bg-white p-5 text-base font-medium text-slate-800 shadow-sm">
+            {error}
           </div>
-        ) : ownerTersaring.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        )}
+
+        {/* KONTEN UTAMA & TABEL */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* BAR NAVIGASI TAB & INFO JUMLAH */}
+          <div className="flex flex-col gap-4 border-b border-slate-200/80 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1.5">
+              {TAB.map((t) => (
+                <button
+                  key={t.kunci}
+                  onClick={() => gantiTab(t.kunci)}
+                  className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                    tab === t.kunci
+                      ? 'bg-white text-emerald-800 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {t.judul}
+                </button>
+              ))}
             </div>
-            <p className="mt-3 text-base font-bold text-[#12302e]">
-              {cari ? 'Owner tidak ditemukan' : 'Tidak ada antrean verifikasi'}
-            </p>
-            <p className="mt-1 max-w-sm text-xs text-slate-500">
-              {cari
-                ? 'Coba gunakan kata kunci nama atau email yang lain.'
-                : 'Semua akun pemilik kos yang mendaftar saat ini sudah diverifikasi.'}
-            </p>
+
+            <div className="self-start rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 sm:self-auto">
+              Total: {loading ? '…' : owners.length} Akun
+            </div>
           </div>
-        ) : (
+
+          {/* TABEL DATA */}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="px-6 py-3.5">No</th>
-                  <th className="px-6 py-3.5">Nama Pemilik Kos</th>
-                  <th className="px-6 py-3.5">Email</th>
-                  <th className="px-6 py-3.5">No. WhatsApp</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Aksi</th>
+            <table className="w-full text-left text-base">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-600">
+                <tr>
+                  <th className="px-6 py-4 font-bold">Owner</th>
+                  <th className="px-6 py-4 font-bold">Email</th>
+                  <th className="px-6 py-4 font-bold">No. WhatsApp</th>
+                  <th className="px-6 py-4 font-bold">Status</th>
+                  <th className="px-6 py-4 text-right font-bold">Aksi</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-100">
-                {ownerTersaring.map((owner, idx) => (
-                  <tr
-                    key={owner.user_id}
-                    className="transition-colors hover:bg-slate-50/70"
-                  >
-                    <td className="px-6 py-4 font-medium text-slate-500">
-                      {idx + 1}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-[#12302e]">
-                      {owner.nama}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{owner.email}</td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {owner.no_wa || (
-                        <span className="text-xs italic text-slate-400">
-                          Tidak diisi
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                        {owner.status_verifikasi}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleVerifikasi(owner)}
-                        disabled={memprosesId === owner.user_id}
-                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#0d5a57] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#0a4341] disabled:cursor-progress disabled:opacity-60"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        {memprosesId === owner.user_id
-                          ? 'Memproses...'
-                          : 'Verifikasi'}
-                      </button>
+                {/* LOADING SKELETON */}
+                {loading &&
+                  [...Array(3)].map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={5} className="px-6 py-5">
+                        <div className="h-8 rounded-xl bg-slate-200/70" />
+                      </td>
+                    </tr>
+                  ))}
+
+                {/* KETIKA DATA KOSONG */}
+                {!loading && owners.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center">
+                      <p className="text-base font-semibold text-slate-700">{tabAktif.kosong}</p>
+                      <p className="mt-1 text-sm text-slate-500">{tabAktif.petunjuk}</p>
                     </td>
                   </tr>
-                ))}
+                )}
+
+                {/* LIST DATA OWNER */}
+                {!loading &&
+                  owners.map((o) => (
+                    <tr key={o.user_id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-6 py-4.5">
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-800">
+                            {inisial(o.nama)}
+                          </div>
+                          <span className="font-bold text-slate-900">{o.nama}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4.5 text-slate-700">{o.email}</td>
+                      <td className="px-6 py-4.5 text-slate-700">{o.no_wa || '-'}</td>
+                      <td className="px-6 py-4.5">
+                        <span
+                          className={`inline-block rounded-full border px-3 py-1 text-xs font-semibold ${
+                            gayaStatus[o.status_verifikasi] || gayaStatus.Menunggu
+                          }`}
+                        >
+                          {o.status_verifikasi}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4.5 text-right">
+                        {o.status_verifikasi === 'Terverifikasi' ? (
+                          <span className="text-sm font-medium text-slate-400">—</span>
+                        ) : (
+                          <div className="flex justify-end gap-2.5">
+                            {o.status_verifikasi === 'Menunggu' && (
+                              <button
+                                onClick={() => proses(o, 'tolak')}
+                                disabled={prosesId === o.user_id}
+                                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-red-400 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-4 focus:ring-red-600/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Tolak
+                              </button>
+                            )}
+                            <button
+                              onClick={() => proses(o, 'verifikasi')}
+                              disabled={prosesId === o.user_id}
+                              className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-600/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {prosesId === o.user_id ? 'Memproses…' : 'Verifikasi'}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
