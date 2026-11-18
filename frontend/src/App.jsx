@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/admin/Dashboard';
 import VerifikasiOwner from './pages/admin/VerifikasiOwner';
+import Fasilitas from './pages/admin/Fasilitas';
 
 function Sementara({ judul }) {
   const { user, logout } = useAuth();
@@ -66,7 +67,7 @@ export default function App() {
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
               <Route path="verifikasi-owner" element={<VerifikasiOwner />} />
-              <Route path="fasilitas" element={<SegeraHadir judul="Master Data Fasilitas" />} />
+              <Route path="fasilitas" element={<Fasilitas />} />
               <Route path="laporan" element={<SegeraHadir judul="Laporan & Export Data" />} />
             </Route>
           </Route>

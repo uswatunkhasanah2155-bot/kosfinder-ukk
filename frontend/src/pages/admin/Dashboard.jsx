@@ -32,32 +32,32 @@ const daftarTahun = Array.from({ length: 5 }, (_, i) => tahunIni - i);
 const filterAwal = { kota: '', tipe: '', status: '', tahun: tahunIni };
 
 const selectClass =
-  'w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm font-medium text-slate-700 transition-all hover:border-emerald-300 hover:bg-white focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-600/10';
+  'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition-all hover:border-emerald-500 focus:border-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-600/15 shadow-sm';
 
 function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
         sorot
-          ? 'border-emerald-200 bg-emerald-50/40'
-          : 'border-slate-200/80 bg-white'
+          ? 'border-emerald-300 bg-emerald-50/50'
+          : 'border-slate-200 bg-white'
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium text-slate-500">{judul}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+          <p className="text-sm font-bold uppercase tracking-wide text-slate-600">{judul}</p>
+          <p className="mt-2.5 text-4xl font-extrabold tracking-tight text-slate-900">
             {nilai ?? 0}
           </p>
           {keterangan && (
-            <p className="mt-1.5 text-xs text-slate-400">{keterangan}</p>
+            <p className="mt-2 text-xs font-medium text-slate-500">{keterangan}</p>
           )}
         </div>
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-colors duration-200 ${
             sorot
-              ? 'bg-emerald-600 text-white'
-              : 'bg-slate-100 text-slate-600 group-hover:bg-emerald-50 group-hover:text-emerald-700'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700'
           }`}
         >
           {ikon}
@@ -70,14 +70,14 @@ function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
 function SkeletonDashboard() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-28 rounded-2xl bg-slate-200/60" />
+          <div key={i} className="h-32 rounded-2xl bg-slate-200/70" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="h-80 rounded-2xl bg-slate-200/60" />
-        <div className="h-80 rounded-2xl bg-slate-200/60" />
+        <div className="h-96 rounded-2xl bg-slate-200/70" />
+        <div className="h-96 rounded-2xl bg-slate-200/70" />
       </div>
     </div>
   );
@@ -125,26 +125,26 @@ export default function Dashboard() {
   const r = data?.ringkasan;
 
   return (
-    <div className="min-h-screen bg-slate-50/70 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-slate-50/70 p-6 md:p-10">
+      <div className="mx-auto max-w-7xl space-y-8">
         {/* HEADER */}
-        <div className="flex flex-col justify-between gap-4 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-end">
+        <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-end">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-600" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+            <div className="flex items-center gap-2.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
                 Ringkasan Operasional
               </span>
             </div>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
               Dashboard Admin
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1.5 text-base text-slate-900">
               Jumlah kos terdaftar per wilayah dan perkembangan booking tahun {filter.tahun}.
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-600 shadow-sm sm:self-auto">
+          <div className="inline-flex items-center gap-2.5 self-start rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm sm:self-auto">
             <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -153,9 +153,9 @@ export default function Dashboard() {
         </div>
 
         {/* FILTER */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <div className="mb-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
               <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
@@ -165,19 +165,19 @@ export default function Dashboard() {
             {adaFilterAktif && (
               <button
                 onClick={() => setFilter(filterAwal)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Reset
+                Reset Filter
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-500">Wilayah</span>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Wilayah</span>
               <select name="kota" value={filter.kota} onChange={ubah} className={selectClass}>
                 <option value="">Semua wilayah</option>
                 {wilayah.map((w) => (
@@ -189,7 +189,7 @@ export default function Dashboard() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-500">Tipe Kos</span>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Tipe Kos</span>
               <select name="tipe" value={filter.tipe} onChange={ubah} className={selectClass}>
                 <option value="">Semua tipe</option>
                 <option value="Putra">Putra</option>
@@ -199,7 +199,7 @@ export default function Dashboard() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-500">Status Booking</span>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Status Booking</span>
               <select name="status" value={filter.status} onChange={ubah} className={selectClass}>
                 <option value="">Semua status</option>
                 <option value="Menunggu">Menunggu</option>
@@ -210,7 +210,7 @@ export default function Dashboard() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-500">Tahun</span>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Tahun</span>
               <select name="tahun" value={filter.tahun} onChange={ubah} className={selectClass}>
                 {daftarTahun.map((t) => (
                   <option key={t} value={t}>
@@ -224,7 +224,7 @@ export default function Dashboard() {
 
         {/* ERROR */}
         {error && (
-          <div className="rounded-2xl border border-slate-300 bg-white p-4 text-sm font-medium text-slate-700 shadow-sm">
+          <div className="rounded-2xl border border-slate-300 bg-white p-5 text-base font-semibold text-slate-800 shadow-sm">
             {error}
           </div>
         )}
@@ -234,16 +234,16 @@ export default function Dashboard() {
 
         {/* KONTEN */}
         {data && (
-          <div className={`space-y-6 transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
+          <div className={`space-y-8 transition-opacity duration-200 ${loading ? 'opacity-60' : 'opacity-100'}`}>
             {/* KARTU RINGKASAN */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
               <KartuStatistik
                 judul="Total Kos"
                 nilai={r.total_kos}
                 keterangan="Unit kos terdaftar"
                 sorot
                 ikon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
                 }
@@ -254,7 +254,7 @@ export default function Dashboard() {
                 nilai={r.total_owner}
                 keterangan="Pemilik tergabung"
                 ikon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 }
@@ -265,7 +265,7 @@ export default function Dashboard() {
                 nilai={r.owner_menunggu_verifikasi}
                 keterangan="Akun owner baru"
                 ikon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
@@ -276,7 +276,7 @@ export default function Dashboard() {
                 nilai={r.total_user}
                 keterangan="Pengguna terdaftar"
                 ikon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 }
@@ -287,7 +287,7 @@ export default function Dashboard() {
                 nilai={r.total_booking}
                 keterangan="Seluruh pengajuan"
                 ikon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 }
@@ -295,24 +295,24 @@ export default function Dashboard() {
             </div>
 
             {/* GRAFIK */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-8 lg:grid-cols-2">
               {/* BAR CHART */}
-              <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                <div className="mb-5 flex items-center justify-between">
+              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-lg font-bold text-slate-900">
                       Jumlah Kos Terdaftar per Wilayah
                     </h3>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       Distribusi unit kos berdasarkan kota
                     </p>
                   </div>
-                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  <span className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                     {data.kos_per_wilayah.length} Wilayah
                   </span>
                 </div>
 
-                <div className="relative min-h-67.5 flex-1">
+                <div className="relative min-h-80 flex-1">
                   {data.kos_per_wilayah.length ? (
                     <Bar
                       data={{
@@ -325,7 +325,7 @@ export default function Dashboard() {
                             hoverBackgroundColor: '#047857',
                             borderRadius: 8,
                             borderSkipped: false,
-                            maxBarThickness: 44,
+                            maxBarThickness: 48,
                           },
                         ],
                       }}
@@ -336,14 +336,16 @@ export default function Dashboard() {
                           legend: { display: false },
                           tooltip: {
                             backgroundColor: '#0f172a',
-                            padding: 12,
-                            cornerRadius: 10,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            padding: 14,
+                            cornerRadius: 12,
                           },
                         },
                         scales: {
                           x: {
                             grid: { display: false },
-                            ticks: { color: '#64748b', font: { size: 12 } },
+                            ticks: { color: '#475569', font: { size: 13, weight: '500' } },
                           },
                           y: {
                             beginAtZero: true,
@@ -351,39 +353,39 @@ export default function Dashboard() {
                             grid: { color: '#f1f5f9' },
                             ticks: {
                               precision: 0,
-                              color: '#64748b',
-                              font: { size: 12 },
+                              color: '#475569',
+                              font: { size: 13, weight: '500' },
                             },
                           },
                         },
                       }}
                     />
                   ) : (
-                    <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-12 text-center">
-                      <p className="text-sm font-medium text-slate-500">Belum ada data kos</p>
-                      <p className="mt-1 text-xs text-slate-400">Sesuaikan filter untuk melihat data lain</p>
+                    <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-16 text-center">
+                      <p className="text-base font-semibold text-slate-700">Belum ada data kos</p>
+                      <p className="mt-1 text-sm text-slate-500">Sesuaikan filter untuk melihat data lain</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* LINE CHART */}
-              <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                <div className="mb-5 flex items-center justify-between">
+              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-lg font-bold text-slate-900">
                       Pertumbuhan Booking {filter.tahun}
                     </h3>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       Tren booking bulanan dan total kumulatif
                     </p>
                   </div>
-                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  <span className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                     Jan – Des
                   </span>
                 </div>
 
-                <div className="relative min-h-67.5 flex-1">
+                <div className="relative min-h-80 flex-1">
                   <Line
                     data={{
                       labels: data.pertumbuhan_booking.map((p) => p.label),
@@ -395,20 +397,20 @@ export default function Dashboard() {
                           backgroundColor: 'rgba(5, 150, 105, 0.1)',
                           fill: true,
                           tension: 0.35,
-                          pointRadius: 3.5,
-                          pointHoverRadius: 6,
+                          pointRadius: 4,
+                          pointHoverRadius: 7,
                           pointBackgroundColor: '#ffffff',
                           pointBorderWidth: 2,
                         },
                         {
                           label: 'Kumulatif',
                           data: data.pertumbuhan_booking.map((p) => p.kumulatif),
-                          borderColor: '#64748b',
-                          backgroundColor: '#64748b',
+                          borderColor: '#475569',
+                          backgroundColor: '#475569',
                           borderDash: [5, 5],
                           tension: 0.35,
-                          pointRadius: 3,
-                          pointHoverRadius: 5,
+                          pointRadius: 3.5,
+                          pointHoverRadius: 6,
                         },
                       ],
                     }}
@@ -426,20 +428,22 @@ export default function Dashboard() {
                           labels: {
                             usePointStyle: true,
                             boxWidth: 8,
-                            color: '#475569',
-                            font: { size: 12 },
+                            color: '#334155',
+                            font: { size: 13, weight: '600' },
                           },
                         },
                         tooltip: {
                           backgroundColor: '#0f172a',
-                          padding: 12,
-                          cornerRadius: 10,
+                          titleFont: { size: 14, weight: 'bold' },
+                          bodyFont: { size: 13 },
+                          padding: 14,
+                          cornerRadius: 12,
                         },
                       },
                       scales: {
                         x: {
                           grid: { display: false },
-                          ticks: { color: '#64748b', font: { size: 12 } },
+                          ticks: { color: '#475569', font: { size: 13, weight: '500' } },
                         },
                         y: {
                           beginAtZero: true,
@@ -447,8 +451,8 @@ export default function Dashboard() {
                           grid: { color: '#f1f5f9' },
                           ticks: {
                             precision: 0,
-                            color: '#64748b',
-                            font: { size: 12 },
+                            color: '#475569',
+                            font: { size: 13, weight: '500' },
                           },
                         },
                       },
