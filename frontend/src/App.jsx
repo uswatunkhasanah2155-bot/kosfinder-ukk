@@ -1,11 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminLayout from './components/AdminLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AdminDashboard from './pages/admin/Dashboard';
+import VerifikasiOwner from './pages/admin/VerifikasiOwner';
 
-// Halaman sementara untuk menguji login. Ganti dengan halaman sebenarnya nanti
-// (peta untuk User, dashboard untuk Owner dan Admin).
 function Sementara({ judul }) {
   const { user, logout } = useAuth();
 
@@ -32,6 +33,19 @@ function Sementara({ judul }) {
   );
 }
 
+function SegeraHadir({ judul }) {
+  return (
+    <div className="mx-auto max-w-7xl p-4 md:p-8">
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <h2 className="text-xl font-bold text-[#12302e]">{judul}</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Halaman ini akan kita kerjakan pada tahap berikutnya.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -49,7 +63,12 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute roles={['Admin']} />}>
-            <Route path="/admin" element={<Sementara judul="Dashboard Admin" />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="verifikasi-owner" element={<VerifikasiOwner />} />
+              <Route path="fasilitas" element={<SegeraHadir judul="Master Data Fasilitas" />} />
+              <Route path="laporan" element={<SegeraHadir judul="Laporan & Export Data" />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
