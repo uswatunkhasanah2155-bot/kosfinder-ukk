@@ -329,6 +329,7 @@ router.get('/:id', async (req, res) => {
 // ===============================
 // TAMBAH KOS (Owner terverifikasi)
 // Body JSON: nama_kos, alamat, kota, latitude, longitude, tipe_kos, fasilitas: [id, id]
+// Kos baru berstatus Menunggu (draf). Tayang di peta setelah PATCH /:id/publikasi
 // Foto diunggah terpisah lewat POST /:id/foto
 // ===============================
 router.post('/', ownerTerverifikasi, async (req, res) => {
@@ -343,8 +344,8 @@ router.post('/', ownerTerverifikasi, async (req, res) => {
       data: {
         ...data,
         owner_id: req.user.user_id,
-        // Owner sudah diverifikasi Admin, jadi kos langsung tayang di peta
-        status_verifikasi: 'Aktif',
+        // Kos baru berstatus Menunggu (draf): belum tampil di peta sampai Owner mempublikasikannya
+        status_verifikasi: 'Menunggu',
         ...(fas.ids?.length && {
           fasilitas: { createMany: { data: fas.ids.map((fasilitas_id) => ({ fasilitas_id })) } },
         }),
@@ -354,7 +355,7 @@ router.post('/', ownerTerverifikasi, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Berhasil menambahkan kos',
+      message: 'Kos tersimpan sebagai draf. Tambahkan kamar, lalu publikasikan agar tampil di peta',
       data: formatKos(kos, { denganKamar: true }),
     });
   } catch (error) {
@@ -424,15 +425,16 @@ router.put('/:id', ownerTerverifikasi, async (req, res) => {
 });
 
 // ===============================
-// AKTIFKAN / NONAKTIFKAN KOS (Owner pemilik)
-// Body: { "status": "Aktif" | "Nonaktif" }
+// PUBLIKASIKAN / NONAKTIFKAN KOS (Owner pemilik)
+// PATCH /:id/publikasi         -> status Aktif (tayang di peta)
+// PATCH /:id/status {status}   -> "Aktif" | "Nonaktif"
+// Syarat publikasi: kos punya minimal satu kamar
 // ===============================
-router.patch('/:id/status', ownerTerverifikasi, async (req, res) => {
+const ubahStatusKos = async (req, res, status) => {
   try {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ success: false, message: 'ID tidak valid' });
 
-    const { status } = req.body;
     if (!['Aktif', 'Nonaktif'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Status harus Aktif atau Nonaktif' });
     }
@@ -442,9 +444,26 @@ router.patch('/:id/status', ownerTerverifikasi, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
+    if (status === 'Aktif') {
+      if (milik.status_verifikasi === 'Aktif') {
+        return res.status(400).json({ success: false, message: 'Kos sudah dipublikasikan' });
+      }
+
+      const jumlahKamar = await prisma.kamar.count({ where: { kos_id: id } });
+      if (jumlahKamar === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tambahkan minimal satu kamar sebelum mempublikasikan kos',
+        });
+      }
+    }
+
     await prisma.kos.update({ where: { kos_id: id }, data: { status_verifikasi: status } });
 
-    res.json({ success: true, message: `Kos berhasil di${status === 'Aktif' ? 'aktifkan' : 'nonaktifkan'}` });
+    res.json({
+      success: true,
+      message: status === 'Aktif' ? 'Kos berhasil dipublikasikan' : 'Kos berhasil dinonaktifkan',
+    });
   } catch (error) {
     console.error('ERROR STATUS KOS:', error);
 
@@ -454,11 +473,15 @@ router.patch('/:id/status', ownerTerverifikasi, async (req, res) => {
       error: error.message,
     });
   }
-});
+};
+
+router.patch('/:id/publikasi', ownerTerverifikasi, (req, res) => ubahStatusKos(req, res, 'Aktif'));
+router.patch('/:id/status', ownerTerverifikasi, (req, res) => ubahStatusKos(req, res, req.body.status));
 
 // ===============================
 // HAPUS KOS (Owner pemilik)
-// Ditolak jika masih ada booking Menunggu / Disetujui
+// Ditolak jika kos sudah punya riwayat booking (status apa pun), supaya data
+// booking, review, dan pendapatan tidak ikut hilang. Gunakan status Nonaktif sebagai gantinya.
 // ===============================
 router.delete('/:id', ownerTerverifikasi, async (req, res) => {
   try {
@@ -470,16 +493,13 @@ router.delete('/:id', ownerTerverifikasi, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    const bookingAktif = await prisma.booking.count({
-      where: {
-        kamar: { kos_id: id },
-        status_booking: { in: ['Menunggu', 'Disetujui'] },
-      },
+    const riwayatBooking = await prisma.booking.count({
+      where: { kamar: { kos_id: id } },
     });
-    if (bookingAktif > 0) {
+    if (riwayatBooking > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Kos tidak bisa dihapus karena masih ada booking yang berjalan',
+        message: 'Kos tidak bisa dihapus karena sudah memiliki riwayat booking. Nonaktifkan kos jika tidak ingin ditampilkan lagi',
       });
     }
 

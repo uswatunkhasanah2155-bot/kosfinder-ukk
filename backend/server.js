@@ -1,4 +1,3 @@
-
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -26,7 +25,8 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Middleware
-app.use(cors());
+// exposedHeaders: agar frontend bisa membaca nama file dari header Content-Disposition saat unduh
+app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
 app.use(express.json());
 
 // Route Autentikasi (Register, Login, Me)

@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../../lib/prisma.js';
 import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
+import { selesaikanBookingJikaPerlu } from '../../lib/bookingOtomatis.js';
 
 const router = express.Router();
 
@@ -83,7 +84,8 @@ const cariBookingOwner = (bookingId, ownerId) =>
 // Body: kamar_id, jenis_booking ("Survey" | "Kamar"), tanggal_survey (YYYY-MM-DD),
 //       durasi_bulan (hanya untuk jenis Kamar, default 1)
 // Survey      -> tidak mengubah status kamar
-// Kamar       -> kamar harus Kosong, lalu berubah menjadi DalamBooking
+// Kamar       -> kamar harus Kosong. Pengajuan TIDAK mengunci kamar; status kamar
+//                baru berubah saat Owner menyetujui (lihat PATCH /booking/:id/setujui)
 // ===============================
 router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
   try {
@@ -129,7 +131,7 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
     if (jenis_booking === 'Kamar' && kamar.status_kamar !== 'Kosong') {
       return res.status(400).json({
         success: false,
-        message: 'Kamar ini sedang dalam proses booking oleh pengguna lain',
+        message: 'Kamar ini sudah dipesan pengguna lain',
       });
     }
 
@@ -149,26 +151,15 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
       });
     }
 
-    const baru = await prisma.$transaction(async (tx) => {
-      if (jenis_booking === 'Kamar') {
-        // updateMany bersyarat: hanya satu pemesan yang berhasil mengunci kamar
-        const kunci = await tx.kamar.updateMany({
-          where: { kamar_id, status_kamar: 'Kosong' },
-          data: { status_kamar: 'DalamBooking' },
-        });
-        if (kunci.count === 0) throw new Error('KAMAR_TIDAK_TERSEDIA');
-      }
-
-      return tx.booking.create({
-        data: {
-          kamar_id,
-          user_id: req.user.user_id,
-          jenis_booking,
-          tanggal_survey: tanggal,
-          durasi_bulan: durasi,
-        },
-        include: INCLUDE_BOOKING,
-      });
+    const baru = await prisma.booking.create({
+      data: {
+        kamar_id,
+        user_id: req.user.user_id,
+        jenis_booking,
+        tanggal_survey: tanggal,
+        durasi_bulan: durasi,
+      },
+      include: INCLUDE_BOOKING,
     });
 
     res.status(201).json({
@@ -178,13 +169,6 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
     });
   } catch (error) {
     console.error('ERROR AJUKAN BOOKING:', error);
-
-    if (error.message === 'KAMAR_TIDAK_TERSEDIA') {
-      return res.status(400).json({
-        success: false,
-        message: 'Kamar ini baru saja dibooking pengguna lain',
-      });
-    }
 
     res.status(500).json({
       success: false,
@@ -201,6 +185,8 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
 // ===============================
 router.get('/booking/saya', verifyToken, checkRole('User'), async (req, res) => {
   try {
+    await selesaikanBookingJikaPerlu();
+
     const where = { user_id: req.user.user_id };
 
     if (req.query.status) {
@@ -239,6 +225,8 @@ router.get('/booking/saya', verifyToken, checkRole('User'), async (req, res) => 
 // ===============================
 router.get('/owner/booking', verifyToken, checkRole('Owner'), async (req, res) => {
   try {
+    await selesaikanBookingJikaPerlu();
+
     const where = { kamar: { kos: { owner_id: req.user.user_id } } };
 
     if (req.query.status) {
@@ -284,6 +272,8 @@ router.get('/owner/booking', verifyToken, checkRole('Owner'), async (req, res) =
 // ===============================
 router.get('/booking/:id', verifyToken, async (req, res) => {
   try {
+    await selesaikanBookingJikaPerlu();
+
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ success: false, message: 'ID tidak valid' });
 
@@ -321,7 +311,10 @@ router.get('/booking/:id', verifyToken, async (req, res) => {
 
 // ===============================
 // SETUJUI BOOKING (Owner pemilik kos)
-// Menunggu -> Disetujui. Jenis Kamar: kamar menjadi Terisi.
+// Menunggu -> Disetujui.
+// Jenis Kamar: kamar Kosong -> DalamBooking (atau langsung Terisi jika tanggal mulai
+// sudah tiba), dan pengajuan Kamar lain yang masih Menunggu untuk kamar yang sama
+// otomatis Ditolak. Jika kamar sudah tidak Kosong, persetujuan ditolak.
 // ===============================
 router.patch('/booking/:id/setujui', ownerTerverifikasi, async (req, res) => {
   try {
@@ -347,9 +340,24 @@ router.patch('/booking/:id/setujui', ownerTerverifikasi, async (req, res) => {
       if (ubah.count === 0) throw new Error('STATUS_BERUBAH');
 
       if (booking.jenis_booking === 'Kamar') {
-        await tx.kamar.update({
-          where: { kamar_id: booking.kamar_id },
-          data: { status_kamar: 'Terisi' },
+        const sudahMulai = booking.tanggal_survey.toISOString().slice(0, 10) <= hariIniWib();
+
+        // updateMany bersyarat: hanya berhasil jika kamar masih Kosong
+        const kunci = await tx.kamar.updateMany({
+          where: { kamar_id: booking.kamar_id, status_kamar: 'Kosong' },
+          data: { status_kamar: sudahMulai ? 'Terisi' : 'DalamBooking' },
+        });
+        if (kunci.count === 0) throw new Error('KAMAR_TIDAK_TERSEDIA');
+
+        // Pengajuan Kamar lain untuk kamar yang sama tidak mungkin lagi dipenuhi
+        await tx.booking.updateMany({
+          where: {
+            kamar_id: booking.kamar_id,
+            jenis_booking: 'Kamar',
+            status_booking: 'Menunggu',
+            booking_id: { not: id },
+          },
+          data: { status_booking: 'Ditolak' },
         });
       }
     });
@@ -363,6 +371,13 @@ router.patch('/booking/:id/setujui', ownerTerverifikasi, async (req, res) => {
     });
   } catch (error) {
     console.error('ERROR SETUJUI BOOKING:', error);
+
+    if (error.message === 'KAMAR_TIDAK_TERSEDIA') {
+      return res.status(400).json({
+        success: false,
+        message: 'Kamar sudah tidak tersedia (terisi atau sudah disetujui untuk pemesan lain)',
+      });
+    }
 
     if (error.message === 'STATUS_BERUBAH') {
       return res.status(400).json({ success: false, message: 'Status booking baru saja berubah, muat ulang data' });
@@ -378,7 +393,7 @@ router.patch('/booking/:id/setujui', ownerTerverifikasi, async (req, res) => {
 
 // ===============================
 // TOLAK BOOKING (Owner pemilik kos)
-// Menunggu -> Ditolak. Jenis Kamar: kamar kembali Kosong.
+// Menunggu -> Ditolak. Status kamar tidak berubah (pengajuan tidak mengunci kamar).
 // ===============================
 router.patch('/booking/:id/tolak', ownerTerverifikasi, async (req, res) => {
   try {
@@ -402,13 +417,6 @@ router.patch('/booking/:id/tolak', ownerTerverifikasi, async (req, res) => {
         data: { status_booking: 'Ditolak' },
       });
       if (ubah.count === 0) throw new Error('STATUS_BERUBAH');
-
-      if (booking.jenis_booking === 'Kamar') {
-        await tx.kamar.updateMany({
-          where: { kamar_id: booking.kamar_id, status_kamar: 'DalamBooking' },
-          data: { status_kamar: 'Kosong' },
-        });
-      }
     });
 
     const terbaru = await cariBookingOwner(id, req.user.user_id);
@@ -463,7 +471,7 @@ router.patch('/booking/:id/selesai', ownerTerverifikasi, async (req, res) => {
 
       if (booking.jenis_booking === 'Kamar') {
         await tx.kamar.updateMany({
-          where: { kamar_id: booking.kamar_id, status_kamar: 'Terisi' },
+          where: { kamar_id: booking.kamar_id, status_kamar: { in: ['DalamBooking', 'Terisi'] } },
           data: { status_kamar: 'Kosong' },
         });
       }

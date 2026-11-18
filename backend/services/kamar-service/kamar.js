@@ -10,7 +10,6 @@ const ownerTerverifikasi = [verifyToken, verifyOwnerVerified];
 // Status yang boleh diatur manual oleh Owner (misalnya penghuni lama yang tidak lewat aplikasi).
 // "DalamBooking" hanya diatur otomatis oleh modul booking.
 const STATUS_MANUAL = ['Kosong', 'Terisi'];
-const STATUS_BOOKING_BERJALAN = ['Menunggu', 'Disetujui'];
 const HARGA_MAKS = 2000000000; // batas tipe integer di PostgreSQL
 
 // ===============================
@@ -65,9 +64,18 @@ const cariKamarMilik = (kamarId, ownerId) =>
     where: { kamar_id: kamarId, kos: { owner_id: ownerId } },
   });
 
-const adaBookingBerjalan = async (kamarId) => {
+// Booking dengan status apa pun dihitung, karena menghapus kamar ikut menghapus booking dan review-nya
+const adaRiwayatBooking = async (kamarId) => {
   const jumlah = await prisma.booking.count({
-    where: { kamar_id: kamarId, status_booking: { in: STATUS_BOOKING_BERJALAN } },
+    where: { kamar_id: kamarId },
+  });
+  return jumlah > 0;
+};
+
+// Status kamar diatur sistem hanya selama ada booking Kamar yang sudah Disetujui
+const adaBookingKamarDisetujui = async (kamarId) => {
+  const jumlah = await prisma.booking.count({
+    where: { kamar_id: kamarId, jenis_booking: 'Kamar', status_booking: 'Disetujui' },
   });
   return jumlah > 0;
 };
@@ -178,15 +186,15 @@ router.put('/kamar/:id', ownerTerverifikasi, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tidak ada data yang diubah' });
     }
 
-    // Selama ada booking berjalan, status ditentukan oleh alur booking, bukan manual
+    // Selama ada booking Kamar yang disetujui, status ditentukan oleh alur booking, bukan manual
     if (
       data.status_kamar !== undefined &&
       data.status_kamar !== kamarLama.status_kamar &&
-      (await adaBookingBerjalan(id))
+      (await adaBookingKamarDisetujui(id))
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Status kamar tidak bisa diubah manual karena masih ada booking yang berjalan',
+        message: 'Status kamar tidak bisa diubah manual karena ada booking yang sudah disetujui',
       });
     }
 
@@ -214,7 +222,7 @@ router.put('/kamar/:id', ownerTerverifikasi, async (req, res) => {
 
 // ===============================
 // HAPUS KAMAR (Owner pemilik kos)
-// Ditolak jika masih ada booking Menunggu / Disetujui
+// Ditolak jika kamar sudah punya riwayat booking (status apa pun)
 // ===============================
 router.delete('/kamar/:id', ownerTerverifikasi, async (req, res) => {
   try {
@@ -226,10 +234,10 @@ router.delete('/kamar/:id', ownerTerverifikasi, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Kamar tidak ditemukan' });
     }
 
-    if (await adaBookingBerjalan(id)) {
+    if (await adaRiwayatBooking(id)) {
       return res.status(400).json({
         success: false,
-        message: 'Kamar tidak bisa dihapus karena masih ada booking yang berjalan',
+        message: 'Kamar tidak bisa dihapus karena sudah memiliki riwayat booking',
       });
     }
 

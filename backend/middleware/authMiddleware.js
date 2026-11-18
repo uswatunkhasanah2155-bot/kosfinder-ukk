@@ -1,4 +1,3 @@
-
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 
@@ -16,7 +15,8 @@ export const verifyToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({
+      // 401 (bukan 403) agar frontend bisa otomatis mengarahkan ke halaman login
+      return res.status(401).json({
         success: false,
         message: 'Token tidak valid atau sudah kadaluarsa',
       });
@@ -62,6 +62,13 @@ export const verifyOwnerVerified = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'Akun Owner tidak ditemukan',
+      });
+    }
+
+    if (owner.status_verifikasi === 'Ditolak') {
+      return res.status(403).json({
+        success: false,
+        message: 'Verifikasi akun Owner ditolak oleh Admin',
       });
     }
 
