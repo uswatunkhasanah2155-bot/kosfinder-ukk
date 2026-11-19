@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import AdminDashboard from './pages/admin/Dashboard';
 import VerifikasiOwner from './pages/admin/VerifikasiOwner';
 import Fasilitas from './pages/admin/Fasilitas';
+import Laporan from './pages/admin/Laporan'; // <-- Import Laporan di sini
 
 function Sementara({ judul }) {
   const { user, logout } = useAuth();
@@ -34,19 +35,6 @@ function Sementara({ judul }) {
   );
 }
 
-function SegeraHadir({ judul }) {
-  return (
-    <div className="mx-auto max-w-7xl p-4 md:p-8">
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-        <h2 className="text-xl font-bold text-[#12302e]">{judul}</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Halaman ini akan kita kerjakan pada tahap berikutnya.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <BrowserRouter>
@@ -68,7 +56,7 @@ export default function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="verifikasi-owner" element={<VerifikasiOwner />} />
               <Route path="fasilitas" element={<Fasilitas />} />
-              <Route path="laporan" element={<SegeraHadir judul="Laporan & Export Data" />} />
+              <Route path="laporan" element={<Laporan />} /> {/* <-- Rute Laporan dipasang di sini */}
             </Route>
           </Route>
 
