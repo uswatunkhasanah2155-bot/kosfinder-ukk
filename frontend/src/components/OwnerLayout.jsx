@@ -55,8 +55,8 @@ export default function OwnerLayout() {
           transition-all duration-300
           lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          w-[270px]
-          ${sidebarCollapsed ? 'lg:w-[84px]' : 'lg:w-[270px]'}
+          w-67.5
+          ${sidebarCollapsed ? 'lg:w-21' : 'lg:w-67.5'}
         `}
       >
 

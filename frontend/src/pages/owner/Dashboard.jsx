@@ -92,7 +92,7 @@ function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-wide text-slate-600">{judul}</p>
-          <p className="mt-2.5 break-words text-3xl font-extrabold tracking-tight text-slate-900">
+          <p className="mt-2.5 wrap-break-word text-3xl font-extrabold tracking-tight text-slate-900">
             {nilai ?? 0}
           </p>
           {keterangan && (
