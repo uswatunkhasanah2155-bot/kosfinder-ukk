@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout, { kelas } from '../components/AuthLayout';
+import { FieldForm, PasswordField } from '../components/FieldForm';
 import { useAuth, homePath } from '../context/AuthContext';
+import { MAKS_EMAIL, MAKS_PASSWORD, pesanEmail, pesanPasswordLogin } from '../utils/ValidasiForm';
+
+// Validasi tiap kolom: mengembalikan pesan error, atau '' jika sudah benar
+const cek = {
+  email: pesanEmail,
+  password: pesanPasswordLogin,
+};
 
 export default function Login() {
   const { login } = useAuth();
@@ -9,17 +17,38 @@ export default function Login() {
   const location = useLocation();
 
   const [form, setForm] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [error, setError] = useState('');
   const [mengirim, setMengirim] = useState(false);
 
-  const ubah = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const ubah = (e) => {
+    const { name, value } = e.target;
+
+    setForm((f) => ({ ...f, [name]: value }));
+    setError(''); // pesan "email atau password salah" hilang begitu pengguna mengetik lagi
+    if (touched[name]) setErrors((er) => ({ ...er, [name]: cek[name](value) }));
+  };
+
+  const tinggalkan = (e) => {
+    const { name } = e.target;
+
+    setTouched((t) => ({ ...t, [name]: true }));
+    setErrors((er) => ({ ...er, [name]: cek[name](form[name]) }));
+  };
 
   const kirim = async (e) => {
     e.preventDefault();
     setError('');
+
+    const semuaError = Object.fromEntries(Object.keys(cek).map((k) => [k, cek[k](form[k])]));
+    setErrors(semuaError);
+    setTouched({ email: true, password: true });
+    if (Object.values(semuaError).some(Boolean)) return;
+
     setMengirim(true);
     try {
-      const user = await login(form.email, form.password);
+      const user = await login(form.email.trim(), form.password);
       navigate(location.state?.dari?.pathname || homePath(user.role), { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Tidak bisa terhubung ke server. Pastikan backend sudah berjalan.');
@@ -30,18 +59,33 @@ export default function Login() {
 
   return (
     <AuthLayout judul="Masuk" subjudul="Masuk untuk mencari kos, mengelola kos, atau memverifikasi pemilik.">
-      <form className="grid gap-4.5" onSubmit={kirim}>
+      <form className="grid gap-4.5" onSubmit={kirim} noValidate>
         {error && <p className={kelas.galat} role="alert">{error}</p>}
 
-        <div>
-          <label className={kelas.label} htmlFor="email">Email</label>
-          <input className={kelas.input} id="email" name="email" type="email" autoComplete="email" required value={form.email} onChange={ubah} />
-        </div>
+        <FieldForm
+          id="email"
+          name="email"
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          maxLength={MAKS_EMAIL}
+          value={form.email}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errors.email}
+        />
 
-        <div>
-          <label className={kelas.label} htmlFor="password">Kata sandi</label>
-          <input className={kelas.input} id="password" name="password" type="password" autoComplete="current-password" required value={form.password} onChange={ubah} />
-        </div>
+        <PasswordField
+          name="password"
+          label="Kata sandi"
+          autoComplete="current-password"
+          maxLength={MAKS_PASSWORD}
+          value={form.password}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errors.password}
+        />
 
         <button className={kelas.tombol} type="submit" disabled={mengirim}>
           {mengirim ? 'Memproses…' : 'Masuk'}

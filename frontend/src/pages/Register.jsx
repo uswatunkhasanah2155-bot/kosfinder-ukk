@@ -1,7 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout, { kelas } from '../components/AuthLayout';
+import { FieldForm, PasswordField } from '../components/FieldForm';
 import { useAuth, homePath } from '../context/AuthContext';
+import api from '../api/axios';
+import {
+  MAKS_EMAIL,
+  MAKS_NAMA,
+  MAKS_PASSWORD,
+  MAKS_WA,
+  bersihkanNoWa,
+  pesanEmail,
+  pesanNama,
+  pesanNoWa,
+  pesanPassword,
+} from '../utils/ValidasiForm';
 
 function PilihanPeran({ value, judul, keterangan, form, onChange }) {
   return (
@@ -22,29 +35,100 @@ function PilihanPeran({ value, judul, keterangan, form, onChange }) {
   );
 }
 
+// Validasi tiap kolom: mengembalikan pesan error, atau '' jika sudah benar
+const cek = {
+  nama: pesanNama,
+  email: pesanEmail,
+  password: pesanPassword,
+  no_wa: pesanNoWa,
+};
+
 export default function Register() {
   const { register, login } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ nama: '', email: '', password: '', no_wa: '', role: 'User' });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [error, setError] = useState(''); // hanya untuk galat umum (mis. server tidak terhubung)
   const [mengirim, setMengirim] = useState(false);
 
-  const ubah = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // Hasil pengecekan email ke server: { email, status } dengan status 'tersedia' | 'terpakai' | 'gagal'
+  const [hasilEmail, setHasilEmail] = useState({ email: '', status: null });
+
+  const emailBersih = form.email.trim().toLowerCase();
+  const formatEmailBenar = pesanEmail(emailBersih) === '';
+  const statusEmail = hasilEmail.email === emailBersih ? hasilEmail.status : null;
+  const mengecekEmail = formatEmailBenar && statusEmail === null;
+  const emailTerpakai = formatEmailBenar && statusEmail === 'terpakai';
+
+  // Cek ketersediaan email otomatis, 0,5 detik setelah pengguna berhenti mengetik
+  useEffect(() => {
+    if (!formatEmailBenar) return;
+
+    let batal = false;
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/auth/cek-email', { params: { email: emailBersih } });
+        if (!batal) setHasilEmail({ email: emailBersih, status: data.tersedia ? 'tersedia' : 'terpakai' });
+      } catch {
+        // Gagal mengecek tidak memblokir pendaftaran: server tetap memvalidasi saat tombol ditekan
+        if (!batal) setHasilEmail({ email: emailBersih, status: 'gagal' });
+      }
+    }, 500);
+
+    return () => {
+      batal = true;
+      clearTimeout(timer);
+    };
+  }, [emailBersih, formatEmailBenar]);
+
+  const ubah = (e) => {
+    const { name } = e.target;
+    const nilai = name === 'no_wa' ? bersihkanNoWa(e.target.value) : e.target.value;
+
+    setForm((f) => ({ ...f, [name]: nilai }));
+    // Setelah kolom pernah ditinggalkan, error ikut diperbarui saat mengetik
+    if (touched[name] && cek[name]) setErrors((er) => ({ ...er, [name]: cek[name](nilai) }));
+  };
+
+  const tinggalkan = (e) => {
+    const { name } = e.target;
+
+    setTouched((t) => ({ ...t, [name]: true }));
+    if (cek[name]) setErrors((er) => ({ ...er, [name]: cek[name](form[name]) }));
+  };
 
   const kirim = async (e) => {
     e.preventDefault();
     setError('');
-    if (form.password.length < 6) {
-      setError('Kata sandi minimal 6 karakter.');
-      return;
-    }
+
+    const semuaError = Object.fromEntries(Object.keys(cek).map((k) => [k, cek[k](form[k])]));
+    setErrors(semuaError);
+    setTouched({ nama: true, email: true, password: true, no_wa: true });
+    if (Object.values(semuaError).some(Boolean) || emailTerpakai) return;
 
     setMengirim(true);
     try {
-      await register(form);
+      await register({ ...form, nama: form.nama.trim(), email: emailBersih });
     } catch (err) {
-      setError(err.response?.data?.message || 'Tidak bisa terhubung ke server. Pastikan backend sudah berjalan.');
+      const pesan = err.response?.data?.message;
+
+      if (!err.response) {
+        setError('Tidak bisa terhubung ke server. Pastikan backend sudah berjalan.');
+      } else if (/email sudah terdaftar/i.test(pesan)) {
+        setHasilEmail({ email: emailBersih, status: 'terpakai' });
+      } else if (/email/i.test(pesan) && !/password|nama/i.test(pesan)) {
+        setErrors((er) => ({ ...er, email: pesan }));
+      } else if (/^password/i.test(pesan)) {
+        setErrors((er) => ({ ...er, password: pesan }));
+      } else if (/^nama/i.test(pesan)) {
+        setErrors((er) => ({ ...er, nama: pesan }));
+      } else if (/whatsapp/i.test(pesan)) {
+        setErrors((er) => ({ ...er, no_wa: pesan }));
+      } else {
+        setError(pesan || 'Pendaftaran gagal. Coba lagi.');
+      }
       setMengirim(false);
       return;
     }
@@ -52,16 +136,29 @@ export default function Register() {
     // Akun sudah dibuat: langsung masuk dengan data yang sama, lalu ke dashboard sesuai peran.
     // (Owner yang belum diverifikasi tetap masuk, dashboard-nya menampilkan banner menunggu verifikasi.)
     try {
-      const user = await login(form.email, form.password);
+      const user = await login(emailBersih, form.password);
       navigate(homePath(user.role), { replace: true });
     } catch {
       navigate('/login', { replace: true });
     }
   };
 
+  // Pesan di bawah kolom email: "sudah terpakai" tampil begitu hasilnya diketahui
+  const errorEmail = emailTerpakai ? (
+    <>
+      Email sudah terdaftar. Gunakan email lain atau{' '}
+      <Link className={kelas.tautan} to="/login">
+        masuk
+      </Link>
+      .
+    </>
+  ) : (
+    errors.email
+  );
+
   return (
     <AuthLayout judul="Buat akun" subjudul="Pilih peranmu, lalu isi data diri.">
-      <form className="grid gap-4.5" onSubmit={kirim}>
+      <form className="grid gap-4.5" onSubmit={kirim} noValidate>
         {error && <p className={kelas.galat} role="alert">{error}</p>}
 
         <div>
@@ -72,26 +169,63 @@ export default function Register() {
           </div>
         </div>
 
-        <div>
-          <label className={kelas.label} htmlFor="nama">Nama lengkap</label>
-          <input className={kelas.input} id="nama" name="nama" type="text" autoComplete="name" required value={form.nama} onChange={ubah} />
-        </div>
+        <FieldForm
+          id="nama"
+          name="nama"
+          label="Nama lengkap"
+          type="text"
+          autoComplete="name"
+          maxLength={MAKS_NAMA}
+          value={form.nama}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errors.nama}
+          valid={touched.nama && !pesanNama(form.nama)}
+        />
 
-        <div>
-          <label className={kelas.label} htmlFor="email">Email</label>
-          <input className={kelas.input} id="email" name="email" type="email" autoComplete="email" required value={form.email} onChange={ubah} />
-        </div>
+        <FieldForm
+          id="email"
+          name="email"
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          maxLength={MAKS_EMAIL}
+          value={form.email}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errorEmail}
+          valid={statusEmail === 'tersedia'}
+          hint={mengecekEmail ? 'Memeriksa email…' : statusEmail === 'tersedia' ? 'Email tersedia' : undefined}
+        />
 
-        <div>
-          <label className={kelas.label} htmlFor="password">Kata sandi</label>
-          <input className={kelas.input} id="password" name="password" type="password" autoComplete="new-password" minLength={6} required value={form.password} onChange={ubah} />
-          <p className="mt-1.5 text-sm text-[#4b625f]">Minimal 6 karakter.</p>
-        </div>
+        <PasswordField
+          name="password"
+          label="Kata sandi"
+          autoComplete="new-password"
+          maxLength={MAKS_PASSWORD}
+          tampilSyarat
+          value={form.password}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errors.password}
+        />
 
-        <div>
-          <label className={kelas.label} htmlFor="no_wa">Nomor WhatsApp (boleh dikosongkan)</label>
-          <input className={kelas.input} id="no_wa" name="no_wa" type="tel" autoComplete="tel" value={form.no_wa} onChange={ubah} />
-        </div>
+        <FieldForm
+          id="no_wa"
+          name="no_wa"
+          label="Nomor WhatsApp (boleh dikosongkan)"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          placeholder="08xx"
+          maxLength={MAKS_WA}
+          value={form.no_wa}
+          onChange={ubah}
+          onBlur={tinggalkan}
+          error={errors.no_wa}
+          valid={touched.no_wa && !!form.no_wa && !pesanNoWa(form.no_wa)}
+        />
 
         <button className={kelas.tombol} type="submit" disabled={mengirim}>
           {mengirim ? 'Memproses…' : 'Buat akun'}

@@ -29,7 +29,6 @@ const waktuWib = (d) =>
 
 const labelStatusKamar = (s) => (s === 'DalamBooking' ? 'Dalam Booking' : s);
 
-// Baca filter dari query: format, kota, tipe, status (khusus ekspor booking)
 const bacaFilter = (query) => {
   const format = query.format || 'xlsx';
   if (!FORMAT.includes(format)) return { error: 'Format harus xlsx, csv, atau pdf' };
@@ -47,7 +46,6 @@ const bacaFilter = (query) => {
   return { format, kota, tipe, status, kosWhere };
 };
 
-// Admin melihat semua data, Owner hanya data kosnya sendiri
 const kosWhereUntuk = (f, user) => ({
   ...f.kosWhere,
   ...(user.role === 'Owner' && { owner_id: user.user_id }),
@@ -63,8 +61,6 @@ const teksFilter = (f, denganStatus = false) => {
 
 // ===============================
 // PENGAMBIL DATA LAPORAN
-// Setiap fungsi mengembalikan { namaFile, judul, kolom, baris, filterTeks }
-// kolom: { header, key, lebar, format? }  (format 'rupiah' untuk kolom uang)
 // ===============================
 const dataKos = async (f, user) => {
   const kos = await prisma.kos.findMany({
@@ -293,7 +289,7 @@ const kirimLaporan = async (res, format, laporan) => {
   if (format === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${namaFile}.csv"`);
-    res.write('\uFEFF'); // BOM supaya Excel membaca UTF-8 dengan benar
+    res.write('\uFEFF');
     await wb.csv.write(res);
     return res.end();
   }
@@ -305,9 +301,7 @@ const kirimLaporan = async (res, format, laporan) => {
 };
 
 // ===============================
-// ENDPOINT EKSPOR: /export/kos, /export/kamar, /export/booking
-// Query: format=xlsx|csv|pdf (default xlsx), kota, tipe, status (khusus booking)
-// Owner mendapat data kosnya sendiri, Admin mendapat seluruh data
+// ENDPOINT EKSPOR KOS, KAMAR, BOOKING
 // ===============================
 const daftarkanEkspor = (nama, ambilData) => {
   router.get(`/export/${nama}`, ...aksesLaporan, async (req, res) => {
@@ -337,71 +331,251 @@ daftarkanEkspor('kamar', dataKamar);
 daftarkanEkspor('booking', dataBooking);
 
 // ===============================
-// BACKUP SELURUH DATA (Admin) - satu file Excel, satu sheet per tabel
-// Kolom password tidak ikut diekspor
+// DOWNLOAD SELURUH DATA (Admin dan Owner)
 // ===============================
 const nilaiSel = (v) => {
   if (v === null || v === undefined) return '';
   if (v instanceof Date) return v.toISOString();
-  if (typeof v === 'object') return typeof v.toNumber === 'function' ? v.toNumber() : JSON.stringify(v);
+  if (typeof v === 'bigint') return v.toString();
+  if (typeof v === 'object') {
+    return typeof v.toNumber === 'function' ? v.toNumber() : JSON.stringify(v);
+  }
   return v;
+};
+
+const dataUntukBackup = async (userLogin) => {
+  const admin = userLogin.role === 'Admin';
+
+  const kos = await prisma.kos.findMany({
+    where: admin ? {} : { owner_id: userLogin.user_id },
+    orderBy: { kos_id: 'asc' },
+  });
+
+  const kosIds = kos.map((k) => k.kos_id);
+
+  const [fotoKos, kosFasilitas, kamar] = await Promise.all([
+    prisma.fotoKos.findMany({
+      where: admin ? {} : { kos_id: { in: kosIds } },
+      orderBy: { foto_id: 'asc' },
+    }),
+    prisma.kosFasilitas.findMany({
+      where: admin ? {} : { kos_id: { in: kosIds } },
+    }),
+    prisma.kamar.findMany({
+      where: admin ? {} : { kos_id: { in: kosIds } },
+      orderBy: { kamar_id: 'asc' },
+    }),
+  ]);
+
+  const fasilitasIds = [...new Set(kosFasilitas.map((item) => item.fasilitas_id))];
+  const kamarIds = kamar.map((item) => item.kamar_id);
+
+  const [fasilitas, booking] = await Promise.all([
+    prisma.fasilitas.findMany({
+      where: admin ? {} : { fasilitas_id: { in: fasilitasIds } },
+      orderBy: { fasilitas_id: 'asc' },
+    }),
+    prisma.booking.findMany({
+      where: admin ? {} : { kamar_id: { in: kamarIds } },
+      orderBy: { booking_id: 'asc' },
+    }),
+  ]);
+
+  const bookingIds = booking.map((item) => item.booking_id);
+
+  const review = await prisma.review.findMany({
+    where: admin ? {} : { booking_id: { in: bookingIds } },
+    orderBy: { review_id: 'asc' },
+  });
+
+  let user;
+  if (admin) {
+    user = await prisma.user.findMany({
+      select: {
+        user_id: true,
+        nama: true,
+        email: true,
+        role: true,
+        no_wa: true,
+        status_verifikasi: true,
+      },
+      orderBy: { user_id: 'asc' },
+    });
+  } else {
+    const userIds = [...new Set([userLogin.user_id, ...booking.map((item) => item.user_id)])];
+    user = await prisma.user.findMany({
+      where: { user_id: { in: userIds } },
+      select: { user_id: true, nama: true, no_wa: true, role: true },
+      orderBy: { user_id: 'asc' },
+    });
+  }
+
+  return [
+    { nama: 'user', data: user },
+    { nama: 'kos', data: kos },
+    { nama: 'foto_kos', data: fotoKos },
+    { nama: 'fasilitas', data: fasilitas },
+    { nama: 'kos_fasilitas', data: kosFasilitas },
+    { nama: 'kamar', data: kamar },
+    { nama: 'booking', data: booking },
+    { nama: 'review', data: review },
+  ];
 };
 
 const tambahSheet = (wb, nama, data) => {
   const ws = wb.addWorksheet(nama);
+
   if (!data.length) {
     ws.addRow(['(tidak ada data)']);
     return;
   }
 
   const kunci = Object.keys(data[0]);
-  ws.columns = kunci.map((k) => ({ header: k, key: k, width: Math.max(12, k.length + 4) }));
-  data.forEach((d) => ws.addRow(Object.fromEntries(kunci.map((k) => [k, nilaiSel(d[k])]))));
+  ws.columns = kunci.map((k) => ({
+    header: k,
+    key: k,
+    width: Math.min(35, Math.max(12, k.length + 4)),
+  }));
+
+  data.forEach((item) => {
+    ws.addRow(Object.fromEntries(kunci.map((k) => [k, nilaiSel(item[k])])));
+  });
 
   const header = ws.getRow(1);
   header.font = { bold: true };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+  header.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE5E7EB' },
+  };
   ws.views = [{ state: 'frozen', ySplit: 1 }];
 };
 
-router.get('/export/backup', verifyToken, checkRole('Admin'), async (req, res) => {
+const kirimBackupXlsx = async (res, semuaData, namaFile) => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Kos-Finder';
+  wb.created = new Date();
+
+  semuaData.forEach(({ nama, data }) => tambahSheet(wb, nama, data));
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${namaFile}.xlsx"`);
+  await wb.xlsx.write(res);
+  return res.end();
+};
+
+const kirimBackupCsv = (res, semuaData, namaFile) => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${namaFile}.csv"`);
+  res.write('\uFEFF');
+  res.write('nama_tabel,data_json\r\n');
+
+  semuaData.forEach(({ nama, data }) => {
+    if (!data.length) {
+      res.write(`${JSON.stringify(nama)},"(tidak ada data)"\r\n`);
+      return;
+    }
+
+    data.forEach((item) => {
+      const isi = Object.fromEntries(
+        Object.entries(item).map(([k, v]) => [k, nilaiSel(v)])
+      );
+      res.write(`${JSON.stringify(nama)},${JSON.stringify(JSON.stringify(isi))}\r\n`);
+    });
+  });
+
+  return res.end();
+};
+
+const kirimBackupPdf = (res, semuaData, namaFile, role) => {
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${namaFile}.pdf"`);
+  doc.pipe(res);
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827')
+    .text('BACKUP SELURUH DATA KOSFINDER', { align: 'center' });
+  doc.moveDown(0.5);
+  doc.font('Helvetica').fontSize(9).fillColor('#6B7280')
+    .text(`Diunduh: ${waktuWib(new Date())} WIB | Role: ${role}`, { align: 'center' });
+  doc.moveDown(1.5);
+
+  semuaData.forEach(({ nama, data }) => {
+    if (doc.y > 730) doc.addPage();
+
+    doc.font('Helvetica-Bold').fontSize(13).fillColor('#111827')
+      .text(`${nama.toUpperCase()} (${data.length} data)`);
+    doc.moveDown(0.4);
+
+    if (!data.length) {
+      doc.font('Helvetica').fontSize(9).fillColor('#6B7280')
+        .text('Tidak ada data pada tabel ini.');
+      doc.moveDown(1);
+      return;
+    }
+
+    data.forEach((item, index) => {
+      const isi = Object.fromEntries(
+        Object.entries(item).map(([k, v]) => [k, nilaiSel(v)])
+      );
+      const teks = `${index + 1}. ${JSON.stringify(isi)}`;
+
+      const tinggi = doc.heightOfString(teks, { width: 510, fontSize: 8 }) + 8;
+      if (doc.y + tinggi > 790) {
+        doc.addPage();
+        doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827')
+          .text(`LANJUTAN ${nama.toUpperCase()}`);
+        doc.moveDown(0.4);
+      }
+
+      doc.font('Helvetica').fontSize(8).fillColor('#374151')
+        .text(teks, { width: 510 });
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(1);
+  });
+
+  doc.end();
+};
+
+// ===============================
+// ROUTE DOWNLOAD SELURUH DATA
+// ===============================
+router.get('/export/backup', ...aksesLaporan, async (req, res) => {
   try {
-    const [user, kos, fotoKos, fasilitas, kosFasilitas, kamar, booking, review] = await Promise.all([
-      prisma.user.findMany({
-        select: { user_id: true, nama: true, email: true, role: true, no_wa: true, status_verifikasi: true },
-        orderBy: { user_id: 'asc' },
-      }),
-      prisma.kos.findMany({ orderBy: { kos_id: 'asc' } }),
-      prisma.fotoKos.findMany({ orderBy: { foto_id: 'asc' } }),
-      prisma.fasilitas.findMany({ orderBy: { fasilitas_id: 'asc' } }),
-      prisma.kosFasilitas.findMany(),
-      prisma.kamar.findMany({ orderBy: { kamar_id: 'asc' } }),
-      prisma.booking.findMany({ orderBy: { booking_id: 'asc' } }),
-      prisma.review.findMany({ orderBy: { review_id: 'asc' } }),
-    ]);
+    await selesaikanBookingJikaPerlu();
 
-    const wb = new ExcelJS.Workbook();
-    wb.creator = 'Kos-Finder';
-    wb.created = new Date();
+    const format = String(req.query.format || 'xlsx').toLowerCase();
 
-    tambahSheet(wb, 'user', user);
-    tambahSheet(wb, 'kos', kos);
-    tambahSheet(wb, 'foto_kos', fotoKos);
-    tambahSheet(wb, 'fasilitas', fasilitas);
-    tambahSheet(wb, 'kos_fasilitas', kosFasilitas);
-    tambahSheet(wb, 'kamar', kamar);
-    tambahSheet(wb, 'booking', booking);
-    tambahSheet(wb, 'review', review);
+    if (!FORMAT.includes(format)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format harus xlsx, csv, atau pdf',
+      });
+    }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="backup-kosfinder-${hariIniWib()}.xlsx"`);
-    await wb.xlsx.write(res);
-    res.end();
+    const semuaData = await dataUntukBackup(req.user);
+    const namaFile = `backup-kosfinder-${hariIniWib()}`;
+
+    if (format === 'csv') {
+      return kirimBackupCsv(res, semuaData, namaFile);
+    }
+
+    if (format === 'pdf') {
+      return kirimBackupPdf(res, semuaData, namaFile, req.user.role);
+    }
+
+    return await kirimBackupXlsx(res, semuaData, namaFile);
   } catch (error) {
     console.error('ERROR BACKUP:', error);
 
     if (res.headersSent) return res.end();
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: 'Gagal membuat backup data',
       error: error.message,
@@ -411,9 +585,6 @@ router.get('/export/backup', verifyToken, checkRole('Admin'), async (req, res) =
 
 // ===============================
 // BUKTI KONFIRMASI BOOKING (PDF)
-// Akses: pemesan, pemilik kos terkait, atau Admin
-// Hanya untuk booking Disetujui atau Selesai
-// Tanggal pada bukti mengikuti tanggal booking (survey / mulai sewa)
 // ===============================
 router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
   try {
@@ -434,9 +605,15 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
 
     const boleh =
       b &&
-      (req.user.role === 'Admin' || b.user_id === req.user.user_id || b.kamar.kos.owner_id === req.user.user_id);
+      (req.user.role === 'Admin' ||
+        b.user_id === req.user.user_id ||
+        b.kamar.kos.owner_id === req.user.user_id);
+
     if (!boleh) {
-      return res.status(404).json({ success: false, message: 'Booking tidak ditemukan' });
+      return res.status(404).json({
+        success: false,
+        message: 'Booking tidak ditemukan',
+      });
     }
 
     if (!['Disetujui', 'Selesai'].includes(b.status_booking)) {
@@ -461,7 +638,6 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
     const kiri = doc.page.margins.left;
     const lebar = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-    // Paragraf dengan potongan tebal dan biasa dalam satu kalimat
     const campur = (bagian) => {
       bagian.forEach(([teks, tebal], i) => {
         doc.font(tebal ? 'Helvetica-Bold' : 'Helvetica').fontSize(11);
@@ -469,10 +645,12 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
       });
     };
 
-    doc.fillColor('#111827').font('Helvetica').fontSize(10).text(nomor, kiri, doc.page.margins.top);
+    doc.fillColor('#111827').font('Helvetica').fontSize(10)
+      .text(nomor, kiri, doc.page.margins.top);
     doc.moveDown(1.5);
 
-    doc.font('Helvetica-Bold').fontSize(14).text('BUKTI KONFIRMASI BOOKING', { align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(14)
+      .text('BUKTI KONFIRMASI BOOKING', { align: 'center' });
     doc.fontSize(12).text(jenisKamar ? 'SEWA KOS' : 'SURVEY KOS', { align: 'center' });
     doc.moveDown(1.5);
 
@@ -493,26 +671,46 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
     ]);
     doc.moveDown(1);
 
-    // Tabel rincian
     const lebarKolom = [36, 180, lebar - 36 - 180 - 90, 90];
     const judulKolom = ['No.', 'Nama Kos', 'Kamar', 'Status'];
-    const isiKolom = ['1.', b.kamar.kos.nama_kos, `No. ${b.kamar.no_kamar} - Tipe ${b.kamar.tipe_kamar}`, b.status_booking];
+    const isiKolom = [
+      '1.',
+      b.kamar.kos.nama_kos,
+      `No. ${b.kamar.no_kamar} - Tipe ${b.kamar.tipe_kamar}`,
+      b.status_booking,
+    ];
     const PAD = 6;
 
     const tinggiBaris = (sel, tebal) => {
       doc.font(tebal ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
-      return Math.max(...sel.map((s, i) => doc.heightOfString(s, { width: lebarKolom[i] - PAD * 2 }))) + PAD * 2;
+      return Math.max(
+        ...sel.map((s, i) =>
+          doc.heightOfString(s, { width: lebarKolom[i] - PAD * 2 })
+        )
+      ) + PAD * 2;
     };
 
     const gambarBaris = (sel, y, tebal) => {
       const tinggi = tinggiBaris(sel, tebal);
       let x = kiri;
+
       sel.forEach((s, i) => {
-        doc.rect(x, y, lebarKolom[i], tinggi).strokeColor('#111827').lineWidth(0.7).stroke();
-        doc.fillColor('#111827').font(tebal ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
-        doc.text(s, x + PAD, y + PAD, { width: lebarKolom[i] - PAD * 2 });
+        doc.rect(x, y, lebarKolom[i], tinggi)
+          .strokeColor('#111827')
+          .lineWidth(0.7)
+          .stroke();
+
+        doc.fillColor('#111827')
+          .font(tebal ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(10);
+
+        doc.text(s, x + PAD, y + PAD, {
+          width: lebarKolom[i] - PAD * 2,
+        });
+
         x += lebarKolom[i];
       });
+
       return tinggi;
     };
 
@@ -520,53 +718,67 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
     y += gambarBaris(judulKolom, y, true);
     y += gambarBaris(isiKolom, y, false);
 
-    // Keterangan tambahan (di luar contoh soal, berguna untuk pencari dan pemilik kos)
     doc.x = kiri;
     doc.y = y + 14;
+
     const baris = [
       ['Kode booking', kode],
       ['Jenis booking', b.jenis_booking],
       [jenisKamar ? 'Tanggal mulai sewa' : 'Tanggal survey', tanggalAngka],
     ];
+
     if (jenisKamar) {
       baris.push(['Durasi sewa', `${b.durasi_bulan} bulan`]);
       baris.push(['Total biaya', rupiah(b.kamar.harga * b.durasi_bulan)]);
     }
+
     baris.forEach(([label, nilai]) => {
       const yBaris = doc.y;
-      doc.font('Helvetica').fontSize(10).text(label, kiri, yBaris, { width: 130 });
-      doc.text(`:  ${nilai}`, kiri + 130, yBaris, { width: lebar - 130 });
+      doc.font('Helvetica').fontSize(10)
+        .text(label, kiri, yBaris, { width: 130 });
+      doc.text(`:  ${nilai}`, kiri + 130, yBaris, {
+        width: lebar - 130,
+      });
     });
 
     doc.moveDown(1.2);
-    doc
-      .font('Helvetica')
-      .fontSize(11)
-      .text(
-        'Demikian bukti konfirmasi booking ini dibuat dengan sebenar-benarnya dan berlaku sebagai bukti sah persetujuan kedua belah pihak.',
-        kiri,
-        doc.y,
-        { width: lebar }
-      );
+    doc.font('Helvetica').fontSize(11).text(
+      'Demikian bukti konfirmasi booking ini dibuat dengan sebenar-benarnya dan berlaku sebagai bukti sah persetujuan kedua belah pihak.',
+      kiri,
+      doc.y,
+      { width: lebar }
+    );
 
-    // Tanda tangan
     const yTtd = doc.y + 28;
     const lebarTtd = 200;
     const xKanan = kiri + lebar - lebarTtd;
 
     doc.font('Helvetica-Bold').fontSize(11);
-    doc.text('Pemilik Kos', kiri, yTtd, { width: lebarTtd, align: 'center' });
-    doc.text('Pencari Kos', xKanan, yTtd, { width: lebarTtd, align: 'center' });
+    doc.text('Pemilik Kos', kiri, yTtd, {
+      width: lebarTtd,
+      align: 'center',
+    });
+    doc.text('Pencari Kos', xKanan, yTtd, {
+      width: lebarTtd,
+      align: 'center',
+    });
 
     doc.font('Helvetica').fontSize(11);
-    doc.text(`Nama : ${b.kamar.kos.owner.nama}`, kiri, yTtd + 80, { width: lebarTtd, align: 'center' });
-    doc.text(`Nama : ${b.user.nama}`, xKanan, yTtd + 80, { width: lebarTtd, align: 'center' });
+    doc.text(`Nama : ${b.kamar.kos.owner.nama}`, kiri, yTtd + 80, {
+      width: lebarTtd,
+      align: 'center',
+    });
+    doc.text(`Nama : ${b.user.nama}`, xKanan, yTtd + 80, {
+      width: lebarTtd,
+      align: 'center',
+    });
 
     doc.end();
   } catch (error) {
     console.error('ERROR BUKTI BOOKING:', error);
 
     if (res.headersSent) return res.end();
+
     res.status(500).json({
       success: false,
       message: 'Gagal membuat bukti konfirmasi',
