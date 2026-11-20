@@ -1,3 +1,4 @@
+
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,19 +13,22 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-[#f6f8f6] font-['Plus_Jakarta_Sans',system-ui,sans-serif] text-[#12302e]">
+    <div className="flex min-h-screen flex-col bg-[#f6f8f6] font-['Plus_Jakarta_Sans',system-ui,sans-serif] text-[#12302e]">
       {/* NAVBAR */}
       <header className="sticky top-0 z-30 border-b border-[#0a4341] bg-[#0d5a57] text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
           {/* Brand & Menu */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 font-extrabold text-[#f0b429]">
-                K
-              </span>
+              <img
+                src="/logo kos.jpg"
+                alt="Logo KosFinder"
+                className="h-10 w-10 rounded-lg object-cover"
+              />
+
               <div>
                 <p className="text-base font-extrabold leading-none tracking-tight">
-                  Kos-Finder
+                  Kospace
                 </p>
                 <p className="mt-0.5 text-[11px] font-medium text-white/70">
                   Panel Admin
@@ -57,6 +61,7 @@ export default function AdminLayout() {
             <span className="hidden font-medium text-white/90 sm:inline">
               {user?.nama}
             </span>
+
             <button
               onClick={logout}
               className="cursor-pointer rounded-lg border border-white/20 bg-white/10 px-3.5 py-1.5 font-semibold text-white transition hover:bg-white/20"
@@ -68,9 +73,16 @@ export default function AdminLayout() {
       </header>
 
       {/* KONTEN HALAMAN */}
-      <main>
+      <main className="flex-1">
         <Outlet />
       </main>
+
+      {/* FOOTER */}
+      <footer className="border-t border-[#dce7e2] bg-white px-4 py-4 text-center">
+        <p className="text-xs font-medium text-[#6b8580]">
+          © 2026 KosFinder. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 }

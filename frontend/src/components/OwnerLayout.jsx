@@ -65,13 +65,17 @@ export default function OwnerLayout() {
           sidebarCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-xl font-extrabold text-amber-400">
-              K
-            </div>
+
+            {/* LOGO GAMBAR */}
+            <img
+              src="/logo kos.jpg"
+              alt="Logo Kospace"
+              className="h-11 w-11 shrink-0 rounded-xl object-cover"
+            />
 
             <div className={`${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               <h1 className="text-lg font-extrabold tracking-tight">
-                KosFinder
+                Kospace
               </h1>
               <p className="text-xs text-emerald-100/70">
                 Owner Dashboard
@@ -195,7 +199,7 @@ export default function OwnerLayout() {
             <span className={`text-xs text-emerald-100/70 ${
               sidebarCollapsed ? 'lg:hidden' : ''
             }`}>
-              KosFinder Management
+              Kospace Management
             </span>
           </div>
 
@@ -211,15 +215,14 @@ export default function OwnerLayout() {
               Keluar
             </span>
           </button>
-
         </div>
       </aside>
 
       {/* AREA KONTEN */}
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
 
         {/* HEADER MOBILE */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-5 shadow-sm lg:hidden">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-slate-200 bg-white px-5 shadow-sm lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="rounded-lg p-2 text-slate-700 hover:bg-slate-100"
@@ -230,7 +233,7 @@ export default function OwnerLayout() {
 
           <div>
             <h2 className="font-extrabold text-[#105b53]">
-              KosFinder
+              Kospace
             </h2>
             <p className="text-[10px] text-slate-500">
               Panel Owner
@@ -240,7 +243,7 @@ export default function OwnerLayout() {
 
         {/* PERINGATAN VERIFIKASI */}
         {belumVerifikasi && (
-          <div className="px-5 pt-5 md:px-8">
+          <div className="shrink-0 px-5 pt-5 md:px-8">
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-900">
               {user?.status_verifikasi === 'Ditolak'
                 ? 'Verifikasi akun Anda ditolak oleh Admin.'
@@ -250,9 +253,17 @@ export default function OwnerLayout() {
         )}
 
         {/* HALAMAN */}
-        <main className="min-h-[calc(100vh-64px)]">
+        <main className="flex-1">
           <Outlet />
         </main>
+
+        {/* FOOTER */}
+        <footer className="mt-auto border-t border-slate-200 bg-white px-5 py-5">
+          <p className="text-center text-xs text-slate-500">
+            © 2026 <span className="font-bold text-[#105b53]">Kospace</span>. All rights reserved.
+          </p>
+        </footer>
+
       </div>
     </div>
   );

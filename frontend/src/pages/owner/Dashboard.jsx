@@ -103,7 +103,7 @@ function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-colors duration-200 ${
             sorot
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700'
+              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-sm'
           }`}
         >
           {ikon}
