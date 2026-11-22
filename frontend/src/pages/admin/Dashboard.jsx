@@ -37,7 +37,7 @@ const selectClass =
 function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-300 hover:bg-emerald-50/50 ${
         sorot
           ? 'border-emerald-300 bg-emerald-50/50'
           : 'border-slate-200 bg-white'
@@ -57,7 +57,7 @@ function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-colors duration-200 ${
             sorot
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700'
+              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-600 group-hover:text-emerald-50 group-hover:shadow-sm'
           }`}
         >
           {ikon}
