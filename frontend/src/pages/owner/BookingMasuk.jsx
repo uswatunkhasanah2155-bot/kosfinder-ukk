@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Download, MessageCircle } from 'lucide-react';
 import api from '../../api/axios';
 import { HalamanOwner, Notif, GalatBox, DataKosong, Badge } from '../../components/owner/Ui';
@@ -34,7 +35,18 @@ export default function BookingMasuk() {
   const [errorAksi, setErrorAksi] = useState('');
   const [prosesId, setProsesId] = useState(null);
 
-  const [tab, setTab] = useState('Menunggu');
+  // Tab mengikuti URL supaya tautan /owner/booking?tab=Disetujui dari Dashboard berfungsi
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get('tab');
+  const tab = TAB.includes(tabParam) ? tabParam : 'Menunggu';
+
+  const gantiTab = (t) => {
+    const next = new URLSearchParams(params);
+    if (t === 'Menunggu') next.delete('tab');
+    else next.set('tab', t);
+    setParams(next, { replace: true });
+  };
+
   const [kosId, setKosId] = useState('');
   const [cari, setCari] = useState('');
 
@@ -121,7 +133,7 @@ export default function BookingMasuk() {
         {TAB.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => gantiTab(t)}
             className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
               tab === t
                 ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'

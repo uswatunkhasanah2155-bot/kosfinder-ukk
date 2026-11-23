@@ -1,15 +1,26 @@
-import { X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, X } from 'lucide-react';
 
 // Komponen kecil yang dipakai bersama oleh semua halaman Owner.
 // Tampilannya meniru halaman Master Fasilitas milik admin.
 
 // Kerangka halaman: latar, judul, deskripsi, dan tombol aksi di kanan
-export function HalamanOwner({ label, judul, deskripsi, aksi, children }) {
+// kembali = false untuk menyembunyikan tautan "Kembali ke Dashboard" di halaman tertentu
+export function HalamanOwner({ label, judul, deskripsi, aksi, kembali = true, children }) {
   return (
     <div className="min-h-screen bg-slate-50/70 p-6 md:p-10">
       <div className="mx-auto max-w-7xl space-y-7">
         <div className="flex flex-col gap-5 border-b border-slate-200/85 pb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
+            {kembali && (
+              <Link
+                to="/owner"
+                className="mb-5 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-x-0.5 hover:border-emerald-500 hover:text-emerald-700"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Kembali ke Dashboard
+              </Link>
+            )}
             <div className="flex items-center gap-2.5">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
               <span className="text-sm font-bold uppercase tracking-wider text-emerald-700">

@@ -543,7 +543,13 @@ export default function KosSaya() {
 
             <div className="sm:col-span-2">
               <span className="mb-2 block text-sm font-bold text-slate-700">Lokasi di peta</span>
-              <PetaPilihLokasi latitude={form.latitude} longitude={form.longitude} onPilih={pilihTitik} />
+              <PetaPilihLokasi
+                latitude={form.latitude}
+                longitude={form.longitude}
+                onPilih={pilihTitik}
+                alamat={form.alamat}
+                kota={form.kota}
+              />
             </div>
 
             <div className="sm:col-span-2">
