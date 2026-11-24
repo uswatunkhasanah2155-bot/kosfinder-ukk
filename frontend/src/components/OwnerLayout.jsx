@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +8,7 @@ import {
   ClipboardList,
   Star,
   FileSpreadsheet,
+  UserRound,
   LogOut,
   Menu,
   X,
@@ -25,6 +25,7 @@ const menuOwner = [
   { label: 'Booking Masuk', to: '/owner/booking', icon: ClipboardList },
   { label: 'Review', to: '/owner/review', icon: Star },
   { label: 'Ekspor Data', to: '/owner/ekspor', icon: FileSpreadsheet },
+  { label: 'Profil Saya', to: '/owner/profil', icon: UserRound },
 ];
 
 export default function OwnerLayout() {
