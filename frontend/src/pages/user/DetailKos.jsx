@@ -20,6 +20,17 @@ const pin = (tersedia) =>
   });
 
 const kartu = 'rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8';
+const ULASAN_PER_HALAMAN = 5;
+
+function Bintang({ nilai, ukuran = 'h-5 w-5' }) {
+  return (
+    <span className="inline-flex gap-0.5" aria-label={`Rating ${nilai} dari 5`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star key={n} className={`${ukuran} ${n <= Math.round(nilai) ? 'fill-emerald-600 text-emerald-600' : 'text-slate-300'}`} />
+      ))}
+    </span>
+  );
+}
 
 export default function KosDetail() {
   const { id } = useParams();
@@ -30,6 +41,8 @@ export default function KosDetail() {
   const [i, setI] = useState(0); // indeks foto yang aktif di lightbox
   const [lightbox, setLightbox] = useState(false);
   const [notice, setNotice] = useState(null); // pemberitahuan login (inline, bukan pop-up)
+  const [ulasan, setUlasan] = useState({ rata: null, jumlah: 0, data: [], halaman: 1 });
+  const [memuatUlasan, setMemuatUlasan] = useState(false);
   const noticeRef = useRef(null);
 
   // GET /api/kos/:id (publik). Jika belum ada, cari dari GET /api/kos.
@@ -45,6 +58,24 @@ export default function KosDetail() {
       .finally(() => { if (!batal) setMemuat(false); });
     return () => { batal = true; };
   }, [id]);
+
+  // GET /api/kos/:id/review (publik): rata-rata rating + daftar ulasan
+  useEffect(() => {
+    let batal = false;
+    setUlasan({ rata: null, jumlah: 0, data: [], halaman: 1 });
+    api.get(`/kos/${id}/review`, { params: { page: 1, limit: ULASAN_PER_HALAMAN } })
+      .then((res) => { if (!batal) setUlasan({ rata: res.data.rata_rating, jumlah: res.data.jumlah_review, data: res.data.data, halaman: 1 }); })
+      .catch(() => {});
+    return () => { batal = true; };
+  }, [id]);
+
+  const ulasanLagi = async () => {
+    setMemuatUlasan(true);
+    try {
+      const res = await api.get(`/kos/${id}/review`, { params: { page: ulasan.halaman + 1, limit: ULASAN_PER_HALAMAN } });
+      setUlasan((s) => ({ ...s, data: [...s.data, ...res.data.data], halaman: s.halaman + 1 }));
+    } catch { /* abaikan, tombol bisa ditekan lagi */ } finally { setMemuatUlasan(false); }
+  };
 
   useEffect(() => { document.title = kos ? `${kos.nama} – Kos-Finder` : 'Kos-Finder'; }, [kos]);
 
@@ -131,7 +162,7 @@ export default function KosDetail() {
               <h1 className="mt-3 text-3xl font-extrabold tracking-tight md:text-5xl">{kos.nama}</h1>
               <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-lg text-slate-600">
                 <span className="flex items-center gap-1.5"><MapPin className="h-5 w-5" /> {kos.kota}{kos.alamat ? ` · ${kos.alamat}` : ''}</span>
-                {kos.rating && <span className="flex items-center gap-1.5 font-bold text-slate-800"><Star className="h-5 w-5 fill-emerald-600 text-emerald-600" /> {kos.rating.toFixed(1)}</span>}
+                {kos.rating && <span className="flex items-center gap-1.5 font-bold text-slate-800"><Star className="h-5 w-5 fill-emerald-600 text-emerald-600" /> {kos.rating.toFixed(1)}{kos.jumlahReview > 0 && <span className="font-medium text-slate-500">({kos.jumlahReview} ulasan)</span>}</span>}
               </div>
             </header>
 
@@ -203,6 +234,39 @@ export default function KosDetail() {
                     </div>
                   </section>
                 )}
+
+                {/* ULASAN */}
+                <section className={kartu} aria-labelledby="judul-ulasan">
+                  <h2 id="judul-ulasan" className="text-2xl font-extrabold">Ulasan penghuni</h2>
+                  {ulasan.jumlah === 0 ? (
+                    <p className="mt-4 text-lg text-slate-600">Belum ada ulasan. Ulasan muncul setelah penyewa menyelesaikan booking.</p>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex items-center gap-4">
+                        <span className="text-5xl font-extrabold">{Number(ulasan.rata).toFixed(1)}</span>
+                        <div>
+                          <Bintang nilai={ulasan.rata} />
+                          <p className="mt-1 text-base text-slate-600">dari {ulasan.jumlah} ulasan</p>
+                        </div>
+                      </div>
+                      <ul className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200">
+                        {ulasan.data.map((r) => (
+                          <li key={r.review_id} className="px-5 py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-base font-bold">{r.pemberi_review ?? 'Pengguna'}{r.kamar ? <span className="font-medium text-slate-500"> · Kamar {r.kamar}</span> : null}</span>
+                              <span className="text-sm text-slate-500">{new Date(r.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                            </div>
+                            <div className="mt-1"><Bintang nilai={r.rating} ukuran="h-4 w-4" /></div>
+                            {r.komentar && <p className="mt-2 text-base leading-relaxed text-slate-700">{r.komentar}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                      {ulasan.data.length < ulasan.jumlah && (
+                        <button onClick={ulasanLagi} disabled={memuatUlasan} className="mt-5 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-base font-bold text-slate-800 transition hover:border-emerald-500 hover:bg-emerald-50 disabled:opacity-60">{memuatUlasan ? 'Memuat…' : 'Tampilkan lebih banyak'}</button>
+                      )}
+                    </>
+                  )}
+                </section>
               </div>
 
               {/* PANEL PENGAJUAN */}

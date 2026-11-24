@@ -34,8 +34,8 @@ const labelClass = 'mb-2 block text-sm font-semibold text-slate-700';
 
 const LANGKAH = [
   { ikon: Search, judul: 'Cari di peta', teks: 'Lihat kos di sekitar kampus atau tempat kerjamu. Marker hijau berarti masih ada kamar kosong.' },
-  { ikon: CalendarCheck, judul: 'Masuk dan ajukan sewa', teks: 'Akun hanya dibutuhkan saat mengajukan. Pilih kamar, lalu tentukan tanggal survei.' },
-  { ikon: ClipboardCheck, judul: 'Tunggu persetujuan', teks: 'Pemilik kos menyetujui pengajuanmu. Statusnya bisa dipantau dari dasbor.' },
+  { ikon: CalendarCheck, judul: 'Masuk dan ajukan sewa', teks: 'Akun hanya dibutuhkan saat mengajukan. Pilih kamar, tentukan survei atau sewa, lalu pilih tanggalnya.' },
+  { ikon: ClipboardCheck, judul: 'Tunggu persetujuan', teks: 'Pemilik kos menyetujui pengajuanmu. Setelah selesai, kamu bisa memberi rating dan ulasan.' },
 ];
 const KEUNGGULAN = [
   { ikon: MapPinned, judul: 'Lokasi jelas di peta', teks: 'Setiap kos punya titik koordinat, jadi jarak ke kampus atau kantor terlihat langsung.' },
@@ -91,7 +91,7 @@ export default function Landing() {
   const [perluLogin, setPerluLogin] = useState(null);
   const [acuan, setAcuan] = useState(null);
   const [fokus, setFokus] = useState(null);
-  const [f, setF] = useState({ kota: '', tipe: '', harga: 0, radius: 0, fasilitas: [], tersedia: false, urut: 'murah' });
+  const [f, setF] = useState({ kota: '', tipe: '', hargaMin: '', hargaMaks: '', radius: 0, fasilitas: [], tersedia: false, urut: 'murah' });
 
   // Gulir ke section: dari navbar/halaman detail (state.scrollTo) atau dari tautan lama berhash (#kos).
   // Setelah menggulir, state dan hash dihapus dari URL sehingga address bar kembali bersih ("/")
@@ -122,7 +122,7 @@ export default function Landing() {
 
   const ubah = (e) => {
     const { name, value } = e.target;
-    setF((s) => ({ ...s, [name]: ['harga', 'radius'].includes(name) ? Number(value) : value }));
+    setF((s) => ({ ...s, [name]: name === 'radius' ? Number(value) : name.startsWith('harga') ? value.replace(/\D/g, '') : value }));
   };
   const toggleFasilitas = (x) => setF((s) => ({ ...s, fasilitas: s.fasilitas.includes(x) ? s.fasilitas.filter((y) => y !== x) : [...s.fasilitas, x] }));
   const semuaFasilitas = useMemo(() => [...new Set(kos.flatMap((k) => k.fasilitas))].sort(), [kos]);
@@ -142,13 +142,15 @@ export default function Landing() {
       .filter((k) =>
         (!f.kota || k.kota === f.kota) &&
         (!f.tipe || k.tipe === f.tipe) &&
-        (!f.harga || k.harga <= f.harga) &&
+        (f.hargaMin === '' || k.harga >= Number(f.hargaMin)) &&
+        (f.hargaMaks === '' || k.harga <= Number(f.hargaMaks)) &&
         (!f.radius || (k.jarak != null && k.jarak <= f.radius)) &&
         f.fasilitas.every((x) => k.fasilitas.includes(x)) &&
         (!f.tersedia || k.kosong > 0))
       .sort(URUTAN[f.urut]),
     [kos, f, acuan]
   );
+  const hargaTerbalik = f.hargaMin !== '' && f.hargaMaks !== '' && Number(f.hargaMin) > Number(f.hargaMaks);
   const berpeta = tampil.filter((k) => Number.isFinite(k.lat) && Number.isFinite(k.lng));
 
   // Melihat kos & foto bebas tanpa login; mengajukan sewa wajib login
@@ -208,11 +210,15 @@ export default function Landing() {
                 <option value="">Semua tipe</option><option value="Putra">Putra</option><option value="Putri">Putri</option><option value="Campur">Campur</option>
               </select>
             </label>
-            <label className="block"><span className={labelClass}>Harga maksimal</span>
-              <select name="harga" value={f.harga} onChange={ubah} className={selectClass}>
-                <option value={0}>Semua harga</option><option value={700000}>Rp700 ribu</option><option value={1000000}>Rp1 juta</option><option value={1500000}>Rp1,5 juta</option>
-              </select>
-            </label>
+            <div>
+              <span className={labelClass}>Rentang harga per bulan</span>
+              <div className="flex items-center gap-2">
+                <input name="hargaMin" value={f.hargaMin} onChange={ubah} inputMode="numeric" placeholder="Min (Rp)" aria-label="Harga minimum" className={`${selectClass} min-w-0`} />
+                <span className="text-slate-400" aria-hidden="true">–</span>
+                <input name="hargaMaks" value={f.hargaMaks} onChange={ubah} inputMode="numeric" placeholder="Maks (Rp)" aria-label="Harga maksimum" className={`${selectClass} min-w-0`} />
+              </div>
+              {hargaTerbalik && <p role="alert" className="mt-1 text-sm font-semibold text-red-700">Harga minimum lebih besar dari maksimum.</p>}
+            </div>
             <label className="block"><span className={labelClass}>Radius dari titik acuan</span>
               <select name="radius" value={f.radius} onChange={ubah} disabled={!acuan} className={selectClass}>
                 <option value={0}>{acuan ? 'Semua jarak' : 'Tentukan titik acuan dulu'}</option>
@@ -282,7 +288,7 @@ export default function Landing() {
                 <div className="flex flex-1 flex-col p-6">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="text-xl font-extrabold leading-snug"><Link to={`/kos/${k.id}`} className="hover:text-emerald-800">{k.nama}</Link></h3>
-                    {k.rating && <span className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-base font-bold text-slate-800"><Star className="h-4 w-4 fill-emerald-600 text-emerald-600" /> {k.rating.toFixed(1)}</span>}
+                    {k.rating && <span className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-base font-bold text-slate-800"><Star className="h-4 w-4 fill-emerald-600 text-emerald-600" /> {k.rating.toFixed(1)}{k.jumlahReview > 0 && <span className="text-sm font-medium text-slate-500">({k.jumlahReview})</span>}</span>}
                   </div>
                   <p className="mt-1.5 flex items-center gap-1.5 text-base text-slate-600"><MapPin className="h-4 w-4 shrink-0" /> {k.kota}{k.alamat ? ` · ${k.alamat}` : ''}{k.jarak != null && <b className="ml-1 text-slate-800">· {fmtJarak(k.jarak)}</b>}</p>
                   <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold">
@@ -302,7 +308,7 @@ export default function Landing() {
             ))}
           </div>
 
-          <div className="h-105 overflow-hidden rounded-3xl border border-slate-200 shadow-sm lg:sticky lg:top-24 lg:h-160" style={{ touchAction: 'none' }}>
+          <div className="h-105 overflow-hidden rounded-3xl border border-slate-200 shadow-sm lg:sticky lg:top-24 lg:h-160">
             <PetaKos daftar={berpeta} acuan={acuan} onPilihAcuan={setAcuan} radiusKm={f.radius} fokus={fokus} aktif={aktif} onAktif={setAktif} onAjukan={ajukan} />
           </div>
         </div>
