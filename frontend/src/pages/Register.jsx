@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import AuthLayout, { kelas } from '../components/AuthLayout';
+import AuthLayout from '../components/AuthLayout';
+import { kelas } from '../components/authStyles';
 import { FieldForm, PasswordField } from '../components/FieldForm';
-import { useAuth, homePath } from '../context/AuthContext';
+import { useAuth, homePath } from '../context/authHooks';
 import api from '../api/axios';
 import {
   MAKS_EMAIL,

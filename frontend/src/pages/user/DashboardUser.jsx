@@ -7,7 +7,7 @@ import {
   LogOut, MapPin, Search, Star, X, XCircle,
 } from 'lucide-react';
 import api from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authHooks';
 import PublicNavbar from '../../components/PublicNavbar';
 import { normalisasi, rupiah } from '../../utils/kos';
 
@@ -122,10 +122,12 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('');
   const [reviewBooking, setReviewBooking] = useState(null);
 
-  const keluar = () => {
-    if (typeof auth.logout === 'function') auth.logout();
-    else { localStorage.removeItem('token'); localStorage.removeItem('user'); }
-    window.location.href = '/login';
+  const keluar = async () => {
+    try {
+      await auth.logout();
+    } finally {
+      window.location.href = '/login';
+    }
   };
 
   const muatRiwayat = useCallback(() => {
@@ -135,23 +137,37 @@ export default function Dashboard() {
       .catch(() => setGagal(true))
       .finally(() => setMemuat(false));
   }, []);
-  useEffect(() => { muatRiwayat(); }, [muatRiwayat]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      muatRiwayat();
+    });
+  }, [muatRiwayat]);
 
   // Kos yang dipilih dari landing / halaman detail
   useEffect(() => {
-    if (!kosId) { setKos(null); setKosGagal(false); return undefined; }
     let batal = false;
-    setMemuatKos(true); setKosGagal(false);
-    api.get(`/kos/${kosId}`)
-      .then((res) => {
-        if (batal) return;
-        const k = normalisasi(res.data.data ?? res.data);
-        setKos(k);
-        const dipilih = k.kamar.find((m) => String(m.id) === String(kamarParam) && m.status !== 'Terisi');
-        setForm((s) => ({ ...s, kamarId: dipilih ? String(dipilih.id) : '' }));
-      })
-      .catch(() => { if (!batal) { setKos(null); setKosGagal(true); } })
-      .finally(() => { if (!batal) setMemuatKos(false); });
+
+    queueMicrotask(() => {
+      if (!kosId) {
+        setKos(null);
+        setKosGagal(false);
+        return;
+      }
+
+      setMemuatKos(true);
+      setKosGagal(false);
+      api.get(`/kos/${kosId}`)
+        .then((res) => {
+          if (batal) return;
+          const k = normalisasi(res.data.data ?? res.data);
+          setKos(k);
+          const dipilih = k.kamar.find((m) => String(m.id) === String(kamarParam) && m.status !== 'Terisi');
+          setForm((s) => ({ ...s, kamarId: dipilih ? String(dipilih.id) : '' }));
+        })
+        .catch(() => { if (!batal) { setKos(null); setKosGagal(true); } })
+        .finally(() => { if (!batal) setMemuatKos(false); });
+    });
+
     return () => { batal = true; };
   }, [kosId, kamarParam]);
 

@@ -1,16 +1,14 @@
 // src/components/FotoKos.jsx
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ImageOff } from 'lucide-react';
 
 // Gambar dengan tampilan cadangan: jika file foto kosong atau gagal dimuat,
 // tampil ikon pengganti (bukan ikon gambar rusak).
 export default function FotoKos({ src, alt = '', className = '' }) {
-  const [rusak, setRusak] = useState(false);
-
-  // Reset status rusak bila alamat foto berganti (misalnya saat pindah foto di galeri)
-  useEffect(() => {
-    setRusak(false);
-  }, [src]);
+  // Simpan sumber yang gagal, bukan boolean. Dengan begitu status "rusak"
+  // otomatis hilang saat src berganti tanpa perlu useEffect + setState.
+  const [sumberRusak, setSumberRusak] = useState(null);
+  const rusak = sumberRusak === src;
 
   if (!src || rusak) {
     return (
@@ -30,7 +28,7 @@ export default function FotoKos({ src, alt = '', className = '' }) {
       alt={alt}
       className={className}
       loading="lazy"
-      onError={() => setRusak(true)}
+      onError={() => setSumberRusak(src)}
     />
   );
 }

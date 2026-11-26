@@ -89,8 +89,7 @@ router.post('/booking/:id/review', verifyToken, checkRole('User'), async (req, r
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengirim review',
-      error: error.message,
+      message: 'Gagal mengirim review'
     });
   }
 });
@@ -145,8 +144,7 @@ router.get('/kos/:id/review', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil review',
-      error: error.message,
+      message: 'Gagal mengambil review'
     });
   }
 });

@@ -117,8 +117,7 @@ router.get('/kos/:kosId/kamar', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil data kamar',
-      error: error.message,
+      message: 'Gagal mengambil data kamar'
     });
   }
 });
@@ -159,8 +158,7 @@ router.post('/kos/:kosId/kamar', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menambahkan kamar',
-      error: error.message,
+      message: 'Gagal menambahkan kamar'
     });
   }
 });
@@ -214,8 +212,7 @@ router.put('/kamar/:id', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengupdate kamar',
-      error: error.message,
+      message: 'Gagal mengupdate kamar'
     });
   }
 });
@@ -249,8 +246,7 @@ router.delete('/kamar/:id', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menghapus kamar',
-      error: error.message,
+      message: 'Gagal menghapus kamar'
     });
   }
 });

@@ -2,7 +2,7 @@ import express from 'express';
 import prisma from '../../lib/prisma.js';
 import upload from '../../middleware/upload.js';
 import { uploadFoto, hapusFoto } from '../../lib/cloudinary.js';
-import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
+import { verifyToken, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -257,8 +257,7 @@ router.get('/', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil data kos',
-      error: error.message,
+      message: 'Gagal mengambil data kos'
     });
   }
 });
@@ -267,7 +266,7 @@ router.get('/', async (req, res) => {
 // GET KOS MILIK OWNER YANG LOGIN (semua status)
 // Harus di atas '/:id' supaya "saya" tidak dianggap id
 // ===============================
-router.get('/saya', verifyToken, checkRole('Owner'), async (req, res) => {
+router.get('/saya', ownerTerverifikasi, async (req, res) => {
   try {
     const kos = await prisma.kos.findMany({
       where: { owner_id: req.user.user_id },
@@ -285,8 +284,7 @@ router.get('/saya', verifyToken, checkRole('Owner'), async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil data kos',
-      error: error.message,
+      message: 'Gagal mengambil data kos'
     });
   }
 });
@@ -320,8 +318,7 @@ router.get('/:id', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil detail kos',
-      error: error.message,
+      message: 'Gagal mengambil detail kos'
     });
   }
 });
@@ -363,8 +360,7 @@ router.post('/', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menambahkan kos',
-      error: error.message,
+      message: 'Gagal menambahkan kos'
     });
   }
 });
@@ -418,8 +414,7 @@ router.put('/:id', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengupdate kos',
-      error: error.message,
+      message: 'Gagal mengupdate kos'
     });
   }
 });
@@ -469,8 +464,7 @@ const ubahStatusKos = async (req, res, status) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengubah status kos',
-      error: error.message,
+      message: 'Gagal mengubah status kos'
     });
   }
 };
@@ -517,8 +511,7 @@ router.delete('/:id', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menghapus kos',
-      error: error.message,
+      message: 'Gagal menghapus kos'
     });
   }
 });
@@ -587,8 +580,7 @@ router.post('/:id/foto', ownerTerverifikasi, terimaFoto, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengunggah foto',
-      error: error.message,
+      message: 'Gagal mengunggah foto'
     });
   }
 });
@@ -617,8 +609,7 @@ router.delete('/foto/:fotoId', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menghapus foto',
-      error: error.message,
+      message: 'Gagal menghapus foto'
     });
   }
 });

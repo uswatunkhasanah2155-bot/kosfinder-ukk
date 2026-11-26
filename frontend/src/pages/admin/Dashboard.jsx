@@ -102,8 +102,12 @@ export default function Dashboard() {
       Object.entries(filter).filter(([, v]) => v !== '')
     );
 
-    setLoading(true);
-    setError('');
+    // Jalankan update status di mikrotask agar tidak memicu render berantai
+    // langsung di dalam effect (aturan react-hooks/set-state-in-effect).
+    queueMicrotask(() => {
+      setLoading(true);
+      setError('');
+    });
     api
       .get(URL_DASHBOARD, { params })
       .then((res) => setData(res.data.data))

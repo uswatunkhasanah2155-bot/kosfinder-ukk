@@ -8,10 +8,13 @@ const router = express.Router();
 
 const emailValid = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
+// Format WA harus sama dengan validasi di frontend (ValidasiForm.js)
+const waValid = (v) => /^(08|628|\+628)\d{7,12}$/.test(String(v).trim());
+
 // Batas panjang input, sama dengan panjang kolom di database (users)
 const MAKS_EMAIL = 100;
 const MAKS_NAMA = 100;
-const MAKS_WA = 20;
+const MAKS_WA = 16;
 const MAKS_PASSWORD_LOGIN = 128;
 
 // Password minimal 8 karakter, harus mengandung huruf, angka, dan simbol
@@ -61,12 +64,23 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: `Email maksimal ${MAKS_EMAIL} karakter` });
     }
 
+    if (nama.trim().length < 3) {
+      return res.status(400).json({ success: false, message: 'Nama minimal 3 karakter' });
+    }
+
     if (nama.trim().length > MAKS_NAMA) {
       return res.status(400).json({ success: false, message: `Nama maksimal ${MAKS_NAMA} karakter` });
     }
 
     if (no_wa && String(no_wa).trim().length > MAKS_WA) {
       return res.status(400).json({ success: false, message: `Nomor WhatsApp maksimal ${MAKS_WA} karakter` });
+    }
+
+    if (no_wa && !waValid(no_wa)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nomor WhatsApp tidak valid, contoh: 081234567890',
+      });
     }
 
     if (!passwordKuat(password)) {
@@ -193,10 +207,19 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    // Token disimpan di cookie httpOnly: tidak bisa dibaca JavaScript,
+    // sehingga lebih aman dari XSS dibanding localStorage.
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.json({
       success: true,
       message: 'Login berhasil',
-      token,
       data: publicUser(user),
     });
   } catch (error) {
@@ -207,6 +230,20 @@ router.post('/login', async (req, res) => {
       message: 'Login gagal',
     });
   }
+});
+
+// ===============================
+// LOGOUT: hapus cookie sesi
+// ===============================
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+  });
+
+  res.json({ success: true, message: 'Berhasil keluar' });
 });
 
 // ===============================

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { kelas } from './AuthLayout';
+import { kelas } from './authStyles';
 import { aturanPassword } from '../utils/ValidasiForm';
 
 // Memakai kelas bersama dari AuthLayout supaya tampilannya sama dengan Login/Register

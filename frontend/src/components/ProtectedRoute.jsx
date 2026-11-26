@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth, homePath } from '../context/AuthContext';
+import { useAuth, homePath } from '../context/authHooks';
 
 // Pemakaian: <Route element={<ProtectedRoute roles={['Owner']} />}> ...rute anak... </Route>
 export default function ProtectedRoute({ roles }) {

@@ -1,10 +1,13 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 
-// Cek token JWT
-export const verifyToken = (req, res, next) => {
+// Cek token JWT, lalu ambil data user terbaru dari database.
+// Role/status selalu diambil dari DB supaya perubahan Admin langsung berlaku
+// walaupun token lama belum kedaluwarsa.
+export const verifyToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // Cookie httpOnly dipakai frontend; header Bearer tetap didukung untuk API client.
+  const token = req.cookies?.token || (authHeader && authHeader.split(' ')[1]);
 
   if (!token) {
     return res.status(401).json({
@@ -13,7 +16,7 @@ export const verifyToken = (req, res, next) => {
     });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, async (err, payload) => {
     if (err) {
       // 401 (bukan 403) agar frontend bisa otomatis mengarahkan ke halaman login
       return res.status(401).json({
@@ -22,8 +25,41 @@ export const verifyToken = (req, res, next) => {
       });
     }
 
-    req.user = user;
-    next();
+    const userId = Number(payload?.user_id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token tidak valid',
+      });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { user_id: userId },
+        select: { user_id: true, role: true, status_verifikasi: true },
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Akun tidak ditemukan. Silakan login kembali.',
+        });
+      }
+
+      req.user = {
+        user_id: user.user_id,
+        role: user.role,
+        status_verifikasi: user.status_verifikasi,
+      };
+
+      return next();
+    } catch (error) {
+      console.error('ERROR VERIFY TOKEN:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Gagal memverifikasi akun',
+      });
+    }
   });
 };
 
@@ -39,53 +75,29 @@ export const checkRole = (...roles) => (req, res, next) => {
   next();
 };
 
-// Memastikan Owner sudah diverifikasi Admin
-export const verifyOwnerVerified = async (req, res, next) => {
-  try {
-    if (!req.user || req.user.role !== 'Owner') {
-      return res.status(403).json({
-        success: false,
-        message: 'Akses khusus Owner',
-      });
-    }
-
-    const owner = await prisma.user.findUnique({
-      where: {
-        user_id: req.user.user_id,
-      },
-      select: {
-        status_verifikasi: true,
-      },
-    });
-
-    if (!owner) {
-      return res.status(404).json({
-        success: false,
-        message: 'Akun Owner tidak ditemukan',
-      });
-    }
-
-    if (owner.status_verifikasi === 'Ditolak') {
-      return res.status(403).json({
-        success: false,
-        message: 'Verifikasi akun Owner ditolak oleh Admin',
-      });
-    }
-
-    if (owner.status_verifikasi !== 'Terverifikasi') {
-      return res.status(403).json({
-        success: false,
-        message: 'Akun Owner belum diverifikasi oleh Admin',
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('ERROR VERIFIKASI OWNER:', error);
-
-    return res.status(500).json({
+// Memastikan Owner sudah diverifikasi Admin.
+// Status sudah diambil segar dari DB oleh verifyToken, jadi tidak perlu query lagi.
+export const verifyOwnerVerified = (req, res, next) => {
+  if (!req.user || req.user.role !== 'Owner') {
+    return res.status(403).json({
       success: false,
-      message: 'Gagal memeriksa verifikasi Owner',
+      message: 'Akses khusus Owner',
     });
   }
+
+  if (req.user.status_verifikasi === 'Ditolak') {
+    return res.status(403).json({
+      success: false,
+      message: 'Verifikasi akun Owner ditolak oleh Admin',
+    });
+  }
+
+  if (req.user.status_verifikasi !== 'Terverifikasi') {
+    return res.status(403).json({
+      success: false,
+      message: 'Akun Owner belum diverifikasi oleh Admin',
+    });
+  }
+
+  return next();
 };

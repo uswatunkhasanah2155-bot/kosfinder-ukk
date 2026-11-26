@@ -1,4 +1,5 @@
 // src/App.jsx
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -6,67 +7,71 @@ import GuestRoute from './components/GuestRoute';
 import AdminLayout from './components/AdminLayout';
 import OwnerLayout from './components/OwnerLayout';
 import Landing from './pages/user/Landing';
-import DetailKos from './pages/user/DetailKos';
-import DashboardUser from './pages/user/DashboardUser';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import AdminDashboard from './pages/admin/Dashboard';
-import VerifikasiOwner from './pages/admin/VerifikasiOwner';
-import Fasilitas from './pages/admin/Fasilitas';
-import Laporan from './pages/admin/Laporan';
-import OwnerDashboard from './pages/owner/Dashboard';
 
-function SegeraHadir({ judul }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-      <h1 className="text-2xl font-bold text-[#0d5a57]">{judul}</h1>
-      <p className="mt-2 text-gray-500">Halaman ini segera hadir.</p>
-    </div>
-  );
+// Halaman berat (peta, chart, tabel) dimuat saat dibuka agar bundle awal lebih ringan.
+const DetailKos = lazy(() => import('./pages/user/DetailKos'));
+const DashboardUser = lazy(() => import('./pages/user/DashboardUser'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const VerifikasiOwner = lazy(() => import('./pages/admin/VerifikasiOwner'));
+const Fasilitas = lazy(() => import('./pages/admin/Fasilitas'));
+const Laporan = lazy(() => import('./pages/admin/Laporan'));
+const OwnerDashboard = lazy(() => import('./pages/owner/Dashboard'));
+const KosSaya = lazy(() => import('./pages/owner/KosSaya'));
+const Kamar = lazy(() => import('./pages/owner/Kamar'));
+const BookingMasuk = lazy(() => import('./pages/owner/BookingMasuk'));
+const ReviewOwner = lazy(() => import('./pages/owner/Review'));
+const EksporOwner = lazy(() => import('./pages/owner/Ekspor'));
+
+function MuatHalaman() {
+  return <div className="p-10 text-center text-gray-500">Memuat halaman…</div>;
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          {/* PUBLIK: dapat dibuka siapa saja tanpa login */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/kos/:id" element={<DetailKos />} />
+        <Suspense fallback={<MuatHalaman />}>
+          <Routes>
+            {/* PUBLIK: dapat dibuka siapa saja tanpa login */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/kos/:id" element={<DetailKos />} />
 
-          {/* Hanya untuk yang belum login; yang sudah login otomatis dialihkan ke dasbor sesuai role */}
-          <Route element={<GuestRoute />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-          </Route>
-
-          {/* Pencari kos: dasbor booking (menerima ?kos=ID&kamar=ID dari landing / detail kos) */}
-          <Route element={<ProtectedRoute roles={['User']} />}>
-            <Route path="/user" element={<DashboardUser />} />
-          </Route>
-
-          <Route element={<ProtectedRoute roles={['Owner']} />}>
-            <Route path="/owner" element={<OwnerLayout />}>
-              <Route index element={<OwnerDashboard />} />
-              <Route path="kos" element={<SegeraHadir judul="Kos Saya" />} />
-              <Route path="kamar" element={<SegeraHadir judul="Kelola Kamar" />} />
-              <Route path="booking" element={<SegeraHadir judul="Booking Masuk" />} />
-              <Route path="review" element={<SegeraHadir judul="Review & Rating" />} />
-              <Route path="ekspor" element={<SegeraHadir judul="Ekspor Data" />} />
+            {/* Hanya untuk yang belum login; yang sudah login otomatis dialihkan ke dasbor sesuai role */}
+            <Route element={<GuestRoute />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
             </Route>
-          </Route>
 
-          <Route element={<ProtectedRoute roles={['Admin']} />}>
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="verifikasi-owner" element={<VerifikasiOwner />} />
-              <Route path="fasilitas" element={<Fasilitas />} />
-              <Route path="laporan" element={<Laporan />} />
+            {/* Pencari kos: dasbor booking (menerima ?kos=ID&kamar=ID dari landing / detail kos) */}
+            <Route element={<ProtectedRoute roles={['User']} />}>
+              <Route path="/user" element={<DashboardUser />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route element={<ProtectedRoute roles={['Owner']} />}>
+              <Route path="/owner" element={<OwnerLayout />}>
+                <Route index element={<OwnerDashboard />} />
+                <Route path="kos" element={<KosSaya />} />
+                <Route path="kamar" element={<Kamar />} />
+                <Route path="booking" element={<BookingMasuk />} />
+                <Route path="review" element={<ReviewOwner />} />
+                <Route path="ekspor" element={<EksporOwner />} />
+              </Route>
+            </Route>
+
+            <Route element={<ProtectedRoute roles={['Admin']} />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="verifikasi-owner" element={<VerifikasiOwner />} />
+                <Route path="fasilitas" element={<Fasilitas />} />
+                <Route path="laporan" element={<Laporan />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );

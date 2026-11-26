@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../../lib/prisma.js';
-import { verifyToken, checkRole } from '../../middleware/authMiddleware.js';
+import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
+import { selesaikanBookingJikaPerlu } from '../../lib/bookingOtomatis.js';
 
 const router = express.Router();
 
@@ -60,8 +61,10 @@ const kerangkaBulan = (isi) =>
 //   sewa pada tiap bulan masa sewanya (mulai dari bulan tanggal booking selama durasi_bulan).
 //   Tanpa filter status, yang dihitung hanya booking Disetujui dan Selesai.
 // ===============================
-router.get('/owner/dashboard', verifyToken, checkRole('Owner'), async (req, res) => {
+router.get('/owner/dashboard', verifyToken, verifyOwnerVerified, async (req, res) => {
   try {
+    await selesaikanBookingJikaPerlu();
+
     const f = bacaFilter(req.query);
     if (f.error) return res.status(400).json({ success: false, message: f.error });
 
@@ -165,8 +168,7 @@ router.get('/owner/dashboard', verifyToken, checkRole('Owner'), async (req, res)
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil dashboard Owner',
-      error: error.message,
+      message: 'Gagal mengambil dashboard Owner'
     });
   }
 });
@@ -179,6 +181,8 @@ router.get('/owner/dashboard', verifyToken, checkRole('Owner'), async (req, res)
 // ===============================
 router.get('/admin/dashboard', verifyToken, checkRole('Admin'), async (req, res) => {
   try {
+    await selesaikanBookingJikaPerlu();
+
     const f = bacaFilter(req.query);
     if (f.error) return res.status(400).json({ success: false, message: f.error });
 
@@ -254,8 +258,7 @@ router.get('/admin/dashboard', verifyToken, checkRole('Admin'), async (req, res)
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil dashboard Admin',
-      error: error.message,
+      message: 'Gagal mengambil dashboard Admin'
     });
   }
 });
@@ -282,8 +285,7 @@ router.get('/wilayah', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil daftar wilayah',
-      error: error.message,
+      message: 'Gagal mengambil daftar wilayah'
     });
   }
 });

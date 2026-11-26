@@ -196,11 +196,15 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    muatBooking();
+    queueMicrotask(() => {
+      muatBooking();
+    });
   }, [muatBooking]);
 
   useEffect(() => {
-    muatDashboard();
+    queueMicrotask(() => {
+      muatDashboard();
+    });
   }, [muatDashboard]);
 
   const ubah = (e) =>

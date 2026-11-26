@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // wajib: tanpa ini peta tidak bisa digeser/di-zoom dengan benar
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Images, Info, Lock, LogIn, MapPin, Star, UserPlus, X } from 'lucide-react';
 import api from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authHooks';
 import PublicNavbar from '../../components/PublicNavbar';
 import FotoKos from '../../components/FotoKos';
 import { normalisasi, rupiah, fotoUrl } from '../../utils/kos';
@@ -48,24 +48,32 @@ export default function KosDetail() {
   // GET /api/kos/:id (publik). Jika belum ada, cari dari GET /api/kos.
   useEffect(() => {
     let batal = false;
-    setMemuat(true); setI(0); setNotice(null); setLightbox(false);
-    window.scrollTo(0, 0);
-    api.get(`/kos/${id}`)
-      .then((res) => normalisasi(res.data.data ?? res.data))
-      .catch(() => api.get('/kos').then((res) => (res.data.data ?? res.data).map(normalisasi).find((k) => String(k.id) === String(id))))
-      .then((d) => { if (!batal) setKos(d ?? null); })
-      .catch(() => { if (!batal) setKos(null); })
-      .finally(() => { if (!batal) setMemuat(false); });
+
+    queueMicrotask(() => {
+      setMemuat(true); setI(0); setNotice(null); setLightbox(false);
+      window.scrollTo(0, 0);
+      api.get(`/kos/${id}`)
+        .then((res) => normalisasi(res.data.data ?? res.data))
+        .catch(() => api.get('/kos').then((res) => (res.data.data ?? res.data).map(normalisasi).find((k) => String(k.id) === String(id))))
+        .then((d) => { if (!batal) setKos(d ?? null); })
+        .catch(() => { if (!batal) setKos(null); })
+        .finally(() => { if (!batal) setMemuat(false); });
+    });
+
     return () => { batal = true; };
   }, [id]);
 
   // GET /api/kos/:id/review (publik): rata-rata rating + daftar ulasan
   useEffect(() => {
     let batal = false;
-    setUlasan({ rata: null, jumlah: 0, data: [], halaman: 1 });
-    api.get(`/kos/${id}/review`, { params: { page: 1, limit: ULASAN_PER_HALAMAN } })
-      .then((res) => { if (!batal) setUlasan({ rata: res.data.rata_rating, jumlah: res.data.jumlah_review, data: res.data.data, halaman: 1 }); })
-      .catch(() => {});
+
+    queueMicrotask(() => {
+      setUlasan({ rata: null, jumlah: 0, data: [], halaman: 1 });
+      api.get(`/kos/${id}/review`, { params: { page: 1, limit: ULASAN_PER_HALAMAN } })
+        .then((res) => { if (!batal) setUlasan({ rata: res.data.rata_rating, jumlah: res.data.jumlah_review, data: res.data.data, halaman: 1 }); })
+        .catch(() => {});
+    });
+
     return () => { batal = true; };
   }, [id]);
 

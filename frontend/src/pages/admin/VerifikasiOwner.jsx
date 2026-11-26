@@ -53,19 +53,21 @@ export default function VerifikasiOwner() {
   useEffect(() => {
     let batal = false;
 
-    setLoading(true);
-    setError('');
-    api
-      .get(URL_OWNER, { params: { status: tab } })
-      .then((res) => {
-        if (!batal) setOwners(res.data.data);
-      })
-      .catch((err) => {
-        if (!batal) setError(err.response?.data?.message || 'Gagal memuat daftar Owner');
-      })
-      .finally(() => {
-        if (!batal) setLoading(false);
-      });
+    queueMicrotask(() => {
+      setLoading(true);
+      setError('');
+      api
+        .get(URL_OWNER, { params: { status: tab } })
+        .then((res) => {
+          if (!batal) setOwners(res.data.data);
+        })
+        .catch((err) => {
+          if (!batal) setError(err.response?.data?.message || 'Gagal memuat daftar Owner');
+        })
+        .finally(() => {
+          if (!batal) setLoading(false);
+        });
+    });
 
     return () => {
       batal = true;

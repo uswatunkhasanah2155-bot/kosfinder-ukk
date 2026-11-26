@@ -106,7 +106,9 @@ export default function Fasilitas() {
   };
 
   useEffect(() => {
-    muatData();
+    queueMicrotask(() => {
+      muatData();
+    });
   }, []);
 
   const tampil = useMemo(() => {

@@ -1,7 +1,7 @@
 // Batas panjang sama dengan kolom di database dan validasi di backend (auth.js)
 export const MAKS_EMAIL = 100;
 export const MAKS_NAMA = 100;
-export const MAKS_WA = 16; // +628 + 12 digit
+export const MAKS_WA = 16; // +628 + 12 digit (sama dengan backend)
 export const MAKS_PASSWORD = 128;
 
 // Aturan password harus sama dengan backend (auth.js -> passwordKuat)

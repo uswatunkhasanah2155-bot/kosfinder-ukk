@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import AuthLayout, { kelas } from '../components/AuthLayout';
+import AuthLayout from '../components/AuthLayout';
+import { kelas } from '../components/authStyles';
 import { FieldForm, PasswordField } from '../components/FieldForm';
-import { useAuth, homePath } from '../context/AuthContext';
+import { useAuth, homePath } from '../context/authHooks';
 import { MAKS_EMAIL, MAKS_PASSWORD, pesanEmail, pesanPasswordLogin } from '../utils/ValidasiForm';
 
 // Validasi tiap kolom: mengembalikan pesan error, atau '' jika sudah benar

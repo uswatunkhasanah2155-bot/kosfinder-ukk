@@ -2,13 +2,19 @@ import express from 'express';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import prisma from '../../lib/prisma.js';
-import { verifyToken, checkRole } from '../../middleware/authMiddleware.js';
+import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
 import { selesaikanBookingJikaPerlu } from '../../lib/bookingOtomatis.js';
 import { NAMA_HARI, NAMA_BULAN, tanggalKata, hariIniWib } from '../../lib/tanggal.js';
 
 const router = express.Router();
 
-const aksesLaporan = [verifyToken, checkRole('Owner', 'Admin')];
+// Admin boleh langsung. Owner wajib sudah terverifikasi seperti endpoint owner lainnya.
+const aksesLaporan = [
+  verifyToken,
+  checkRole('Owner', 'Admin'),
+  (req, res, next) =>
+    req.user.role === 'Admin' ? next() : verifyOwnerVerified(req, res, next),
+];
 
 const FORMAT = ['xlsx', 'csv', 'pdf'];
 const TIPE_KOS = ['Putra', 'Putri', 'Campur'];
@@ -23,6 +29,10 @@ const parseId = (v) => {
 };
 
 const rupiah = (n) => `Rp ${Number(n).toLocaleString('id-ID')}`;
+
+// Cegah formula injection saat file dibuka di Excel/Sheets.
+const amanSpreadsheet = (v) =>
+  typeof v === 'string' && /^[=+\-@]/.test(v) ? `'${v}` : v;
 
 const waktuWib = (d) =>
   new Date(d).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' });
@@ -190,7 +200,11 @@ const buatWorkbook = (namaSheet, kolom, baris) => {
 
   const ws = wb.addWorksheet(namaSheet.slice(0, 31));
   ws.columns = kolom.map((k) => ({ header: k.header, key: k.key, width: k.lebar }));
-  ws.addRows(baris);
+  ws.addRows(
+    baris.map((row) =>
+      Object.fromEntries(Object.entries(row).map(([k, v]) => [k, amanSpreadsheet(v)]))
+    )
+  );
 
   kolom.forEach((k) => {
     if (k.format === 'rupiah') ws.getColumn(k.key).numFmt = '"Rp" #,##0';
@@ -319,8 +333,7 @@ const daftarkanEkspor = (nama, ambilData) => {
       if (res.headersSent) return res.end();
       res.status(500).json({
         success: false,
-        message: 'Gagal membuat file ekspor',
-        error: error.message,
+        message: 'Gagal membuat file ekspor'
       });
     }
   });
@@ -438,7 +451,9 @@ const tambahSheet = (wb, nama, data) => {
   }));
 
   data.forEach((item) => {
-    ws.addRow(Object.fromEntries(kunci.map((k) => [k, nilaiSel(item[k])])));
+    ws.addRow(
+      Object.fromEntries(kunci.map((k) => [k, amanSpreadsheet(nilaiSel(item[k]))]))
+    );
   });
 
   const header = ws.getRow(1);
@@ -481,7 +496,7 @@ const kirimBackupCsv = (res, semuaData, namaFile) => {
 
     data.forEach((item) => {
       const isi = Object.fromEntries(
-        Object.entries(item).map(([k, v]) => [k, nilaiSel(v)])
+        Object.entries(item).map(([k, v]) => [k, amanSpreadsheet(nilaiSel(v))])
       );
       res.write(`${JSON.stringify(nama)},${JSON.stringify(JSON.stringify(isi))}\r\n`);
     });
@@ -577,8 +592,7 @@ router.get('/export/backup', ...aksesLaporan, async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: 'Gagal membuat backup data',
-      error: error.message,
+      message: 'Gagal membuat backup data'
     });
   }
 });
@@ -781,8 +795,7 @@ router.get('/booking/:id/bukti', verifyToken, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal membuat bukti konfirmasi',
-      error: error.message,
+      message: 'Gagal membuat bukti konfirmasi'
     });
   }
 });

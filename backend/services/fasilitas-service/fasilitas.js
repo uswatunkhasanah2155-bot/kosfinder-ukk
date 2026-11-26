@@ -23,8 +23,7 @@ router.get('/', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil data fasilitas',
-      error: error.message,
+      message: 'Gagal mengambil data fasilitas'
     });
   }
 });
@@ -64,8 +63,7 @@ router.get('/:id', async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil detail fasilitas',
-      error: error.message,
+      message: 'Gagal mengambil detail fasilitas'
     });
   }
 });
@@ -105,8 +103,7 @@ router.post('/', verifyToken, checkRole('Admin'), async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menambahkan fasilitas',
-      error: error.message,
+      message: 'Gagal menambahkan fasilitas'
     });
   }
 });
@@ -166,8 +163,7 @@ router.put('/:id', verifyToken, checkRole('Admin'), async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengupdate fasilitas',
-      error: error.message,
+      message: 'Gagal mengupdate fasilitas'
     });
   }
 });
@@ -222,8 +218,7 @@ router.delete('/:id', verifyToken, checkRole('Admin'), async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menghapus fasilitas',
-      error: error.message,
+      message: 'Gagal menghapus fasilitas'
     });
   }
 });

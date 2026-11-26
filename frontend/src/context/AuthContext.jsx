@@ -1,41 +1,34 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../api/axios';
-
-const AuthContext = createContext(null);
-
-const ambilUserTersimpan = () => {
-  try {
-    return JSON.parse(localStorage.getItem('user'));
-  } catch {
-    return null;
-  }
-};
-
-// Halaman awal tiap peran setelah login
-export const homePath = (role) => ({ Admin: '/admin', Owner: '/owner' }[role] || '/');
+import { AuthContext } from './authHooks';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(ambilUserTersimpan);
-  const [loading, setLoading] = useState(Boolean(localStorage.getItem('token')));
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Saat aplikasi dibuka: segarkan data user dari server (mis. status verifikasi Owner)
+  // Cek sesi dari cookie httpOnly saat aplikasi dibuka.
   useEffect(() => {
-    if (!localStorage.getItem('token')) return;
+    let batal = false;
 
     api
       .get('/auth/me')
       .then(({ data }) => {
-        setUser(data.data);
-        localStorage.setItem('user', JSON.stringify(data.data));
+        if (!batal) setUser(data.data);
       })
-      .catch(() => {}) // token tidak valid sudah ditangani interceptor
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!batal) setUser(null);
+      })
+      .finally(() => {
+        if (!batal) setLoading(false);
+      });
+
+    return () => {
+      batal = true;
+    };
   }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.data));
     setUser(data.data);
     return data.data;
   };
@@ -45,10 +38,12 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      setUser(null);
+    }
   };
 
   return (
@@ -57,5 +52,3 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
-
-export const useAuth = () => useContext(AuthContext);

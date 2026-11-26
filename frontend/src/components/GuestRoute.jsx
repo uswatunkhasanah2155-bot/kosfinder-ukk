@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth, homePath } from '../context/AuthContext';
+import { useAuth, homePath } from '../context/authHooks';
 
 // Untuk halaman yang hanya boleh dibuka saat BELUM login (/login dan /register).
 // Pemakaian: <Route element={<GuestRoute />}> ...rute anak... </Route>

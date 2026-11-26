@@ -1,4 +1,5 @@
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../../lib/prisma.js';
 import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
 import { selesaikanBookingJikaPerlu } from '../../lib/bookingOtomatis.js';
@@ -135,32 +136,57 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
       });
     }
 
-    // Cegah pengajuan ganda dari user yang sama untuk kamar dan jenis yang sama
-    const sudahAda = await prisma.booking.findFirst({
-      where: {
-        user_id: req.user.user_id,
-        kamar_id,
-        jenis_booking,
-        status_booking: { in: ['Menunggu', 'Disetujui'] },
-      },
-    });
-    if (sudahAda) {
-      return res.status(400).json({
-        success: false,
-        message: `Anda sudah punya booking ${jenis_booking} yang masih berjalan untuk kamar ini`,
-      });
-    }
+    // Cegah pengajuan ganda dari user yang sama untuk kamar dan jenis yang sama.
+    // Pengecekan + create dijalankan dalam transaksi SERIALIZABLE agar dua request
+    // bersamaan tidak bisa lolos keduanya (salah satu akan gagal dengan P2034).
+    let baru;
+    try {
+      baru = await prisma.$transaction(
+        async (tx) => {
+          const sudahAda = await tx.booking.findFirst({
+            where: {
+              user_id: req.user.user_id,
+              kamar_id,
+              jenis_booking,
+              status_booking: { in: ['Menunggu', 'Disetujui'] },
+            },
+          });
+          if (sudahAda) {
+            const error = new Error('BOOKING_DUPLIKAT');
+            throw error;
+          }
 
-    const baru = await prisma.booking.create({
-      data: {
-        kamar_id,
-        user_id: req.user.user_id,
-        jenis_booking,
-        tanggal_survey: tanggal,
-        durasi_bulan: durasi,
-      },
-      include: INCLUDE_BOOKING,
-    });
+          return tx.booking.create({
+            data: {
+              kamar_id,
+              user_id: req.user.user_id,
+              jenis_booking,
+              tanggal_survey: tanggal,
+              durasi_bulan: durasi,
+            },
+            include: INCLUDE_BOOKING,
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error) {
+      if (error.message === 'BOOKING_DUPLIKAT') {
+        return res.status(409).json({
+          success: false,
+          message: `Anda sudah punya booking ${jenis_booking} yang masih berjalan untuk kamar ini`,
+        });
+      }
+
+      // Konflik serialisasi dari database: aman untuk diminta retry.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        return res.status(409).json({
+          success: false,
+          message: 'Data booking baru saja berubah. Silakan coba lagi.',
+        });
+      }
+
+      throw error;
+    }
 
     res.status(201).json({
       success: true,
@@ -172,8 +198,7 @@ router.post('/booking', verifyToken, checkRole('User'), async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengajukan booking',
-      error: error.message,
+      message: 'Gagal mengajukan booking'
     });
   }
 });
@@ -213,8 +238,7 @@ router.get('/booking/saya', verifyToken, checkRole('User'), async (req, res) => 
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil riwayat booking',
-      error: error.message,
+      message: 'Gagal mengambil riwayat booking'
     });
   }
 });
@@ -223,7 +247,7 @@ router.get('/booking/saya', verifyToken, checkRole('User'), async (req, res) => 
 // BOOKING MASUK (Owner)
 // Query opsional: status, kos_id
 // ===============================
-router.get('/owner/booking', verifyToken, checkRole('Owner'), async (req, res) => {
+router.get('/owner/booking', ownerTerverifikasi, async (req, res) => {
   try {
     await selesaikanBookingJikaPerlu();
 
@@ -261,8 +285,7 @@ router.get('/owner/booking', verifyToken, checkRole('Owner'), async (req, res) =
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil data booking',
-      error: error.message,
+      message: 'Gagal mengambil data booking'
     });
   }
 });
@@ -303,8 +326,7 @@ router.get('/booking/:id', verifyToken, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal mengambil detail booking',
-      error: error.message,
+      message: 'Gagal mengambil detail booking'
     });
   }
 });
@@ -385,8 +407,7 @@ router.patch('/booking/:id/setujui', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menyetujui booking',
-      error: error.message,
+      message: 'Gagal menyetujui booking'
     });
   }
 });
@@ -435,8 +456,7 @@ router.patch('/booking/:id/tolak', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menolak booking',
-      error: error.message,
+      message: 'Gagal menolak booking'
     });
   }
 });
@@ -493,8 +513,7 @@ router.patch('/booking/:id/selesai', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menyelesaikan booking',
-      error: error.message,
+      message: 'Gagal menyelesaikan booking'
     });
   }
 });

@@ -1,6 +1,6 @@
 // src/components/PublicNavbar.jsx  (dipakai Landing dan KosDetail)
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authHooks';
 
 const MENU = [['kos', 'Cari Kos'], ['cara', 'Cara Sewa'], ['faq', 'FAQ'], ['pemilik', 'Untuk Pemilik']];
 
