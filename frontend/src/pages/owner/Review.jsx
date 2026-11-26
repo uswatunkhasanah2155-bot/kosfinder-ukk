@@ -1,223 +1,186 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Star, StarOff } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Star } from 'lucide-react';
 import api from '../../api/axios';
-import { Kosong, Pesan } from '../../components/ui';
+import { HalamanOwner, GalatBox, DataKosong } from '../../components/owner/Ui';
+import { kelasSelect, formatWaktu } from '../../utils/ownerHelper';
 
-const BATAL = 1;
+// Review diambil dari GET /api/owner/booking: setiap booking membawa review-nya (jika ada).
+// Dengan begitu semua review tampil, termasuk untuk kos yang sedang Nonaktif atau Draf.
 
-const Bintang = ({ nilai, kecil = false }) => (
-  <span className="inline-flex items-center gap-0.5" aria-label={`Rating ${nilai} dari 5`}>
-    {[1, 2, 3, 4, 5].map((n) => (
-      <Star
-        key={n}
-        className={`${kecil ? 'h-3.5 w-3.5' : 'h-5 w-5'} ${
-          n <= nilai ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
-        }`}
-      />
-    ))}
-  </span>
-);
+function Bintang({ nilai, ukuran = 'h-5 w-5' }) {
+  return (
+    <span className="inline-flex gap-0.5" aria-label={`${nilai} dari 5 bintang`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          className={`${ukuran} ${i <= nilai ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`}
+        />
+      ))}
+    </span>
+  );
+}
 
 export default function Review() {
+  const [data, setData] = useState([]);
   const [daftarKos, setDaftarKos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [kosId, setKosId] = useState('');
-  const [review, setReview] = useState({ rata: null, jumlah: 0, data: [] });
-  const [halaman, setHalaman] = useState(1);
-  const [memuat, setMemuat] = useState(true);
-  const [pesan, setPesan] = useState(null);
+  const [rating, setRating] = useState('');
 
-  useEffect(() => {
-    let batal = false;
-    queueMicrotask(() => {
-      api
-        .get('/kos/saya')
-        .then((res) => {
-          if (batal) return;
-          const kos = res.data.data ?? [];
-          setDaftarKos(kos);
-          const aktif = kos.find((k) => k.status_verifikasi === 'Aktif');
-          if (aktif) setKosId(String(aktif.kos_id));
-        })
-        .catch(() => {
-          if (!batal) setPesan({ tipe: 'galat', teks: 'Gagal memuat data kos.' });
-        })
-        .finally(() => {
-          if (!batal) setMemuat(false);
-        });
-    });
-    return () => {
-      batal = true;
-    };
+  const muatData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get('/owner/booking', { params: { status: 'Selesai' } });
+      setData(res.data.data.filter((b) => b.review));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal memuat review');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!kosId) return undefined;
-    let batal = false;
-    queueMicrotask(() => {
-      setMemuat(true);
-      api
-        .get(`/kos/${kosId}/review`, { params: { page: halaman, limit: 10 } })
-        .then((res) => {
-          if (!batal) {
-            setReview({
-              rata: res.data.rata_rating,
-              jumlah: res.data.jumlah_review,
-              data: res.data.data ?? [],
-              totalHalaman: Math.max(1, Math.ceil((res.data.jumlah_review ?? 0) / (res.data.limit ?? 10))),
-            });
-          }
-        })
-        .catch(() => {
-          if (!batal) {
-            setReview({ rata: null, jumlah: 0, data: [], totalHalaman: 1 });
-            setPesan({ tipe: 'galat', teks: 'Review hanya tersedia untuk kos yang sudah aktif.' });
-          }
-        })
-        .finally(() => {
-          if (!batal) setMemuat(false);
-        });
-    });
-    return () => {
-      batal = true;
-    };
-  }, [kosId, halaman]);
+    muatData();
+  }, [muatData]);
 
-  const kosTerpilih = useMemo(
-    () => daftarKos.find((k) => String(k.kos_id) === String(kosId)),
-    [daftarKos, kosId]
+  useEffect(() => {
+    api
+      .get('/kos/saya')
+      .then((res) => setDaftarKos(res.data.data))
+      .catch(() => setDaftarKos([]));
+  }, []);
+
+  // Ringkasan dihitung dari review sesuai pilihan kos (rating tidak memengaruhi ringkasan)
+  const dalamKos = useMemo(
+    () => data.filter((b) => !kosId || b.kos.kos_id === Number(kosId)),
+    [data, kosId]
+  );
+
+  const ringkasan = useMemo(() => {
+    const jumlah = dalamKos.length;
+    const total = dalamKos.reduce((a, b) => a + b.review.rating, 0);
+    const sebaran = [5, 4, 3, 2, 1].map((n) => ({
+      n,
+      jumlah: dalamKos.filter((b) => b.review.rating === n).length,
+    }));
+    return { jumlah, rata: jumlah ? Math.round((total / jumlah) * 10) / 10 : null, sebaran };
+  }, [dalamKos]);
+
+  const tampil = useMemo(
+    () =>
+      dalamKos
+        .filter((b) => !rating || b.review.rating === Number(rating))
+        .sort((a, b) => new Date(b.review.dibuat_pada) - new Date(a.review.dibuat_pada)),
+    [dalamKos, rating]
   );
 
   return (
-    <div className="min-h-screen bg-slate-50/70 p-6 md:p-10">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 md:text-3xl">Review & Rating</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Lihat penilaian dan komentar pencari kos yang bookingnya telah selesai.
-          </p>
-        </div>
+    <HalamanOwner
+      label="Umpan Balik"
+      judul="Review"
+      deskripsi="Penilaian dari pencari kos yang sudah menyelesaikan booking di kos Anda."
+    >
+      <GalatBox pesan={error} onCoba={muatData} />
 
-        <Pesan pesan={pesan} onTutup={() => setPesan(null)} />
+      <select
+        value={kosId}
+        onChange={(e) => setKosId(e.target.value)}
+        className={`${kelasSelect} sm:max-w-sm`}
+        aria-label="Filter kos"
+      >
+        <option value="">Semua kos</option>
+        {daftarKos.map((k) => (
+          <option key={k.kos_id} value={k.kos_id}>
+            {k.nama_kos}
+          </option>
+        ))}
+      </select>
 
-        {!memuat && daftarKos.length === 0 ? (
-          <Kosong judul="Belum ada kos" deskripsi="Buat kos terlebih dahulu di menu Kos Saya." />
-        ) : (
-          <>
-            <label className="block rounded-3xl border border-slate-200 bg-white p-5">
-              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                Pilih kos
-              </span>
-              <select
-                value={kosId}
-                onChange={(e) => {
-                  setKosId(e.target.value);
-                  setHalaman(1);
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800"
-              >
-                <option value="">-- Pilih kos --</option>
-                {daftarKos.map((k) => (
-                  <option key={k.kos_id} value={k.kos_id}>
-                    {k.nama_kos}
-                    {k.status_verifikasi !== 'Aktif' ? ' (belum aktif)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {loading && <div className="h-48 animate-pulse rounded-2xl bg-slate-200/70" />}
 
-            {kosId && (
-              <section className="space-y-5">
-                <div className="flex flex-wrap items-center gap-6 rounded-3xl border border-slate-200 bg-white p-6">
-                  <div className="text-center">
-                    <p className="text-4xl font-extrabold text-slate-900">
-                      {review.rata != null ? Number(review.rata).toFixed(1) : '-'}
+      {!loading && !error && (
+        <>
+          {/* RINGKASAN */}
+          <div className="grid gap-6 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:grid-cols-[220px_1fr]">
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-emerald-50 px-6 py-6 text-center">
+              <p className="text-5xl font-extrabold tracking-tight text-slate-900">
+                {ringkasan.rata === null ? '-' : String(ringkasan.rata).replace('.', ',')}
+              </p>
+              <div className="mt-2">
+                <Bintang nilai={Math.round(ringkasan.rata || 0)} />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-slate-600">{ringkasan.jumlah} review</p>
+            </div>
+
+            <div className="flex flex-col justify-center gap-2.5">
+              {ringkasan.sebaran.map((s) => (
+                <button
+                  key={s.n}
+                  onClick={() => setRating(rating === String(s.n) ? '' : String(s.n))}
+                  className={`flex items-center gap-3 rounded-xl px-2 py-1 text-left transition hover:bg-slate-50 ${
+                    rating === String(s.n) ? 'bg-emerald-50' : ''
+                  }`}
+                  aria-label={`Tampilkan review ${s.n} bintang`}
+                >
+                  <span className="w-12 text-sm font-bold text-slate-700">{s.n} bintang</span>
+                  <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <span
+                      className="block h-full rounded-full bg-emerald-600"
+                      style={{ width: `${ringkasan.jumlah ? (s.jumlah / ringkasan.jumlah) * 100 : 0}%` }}
+                    />
+                  </span>
+                  <span className="w-8 text-right text-sm font-semibold text-slate-600">{s.jumlah}</span>
+                </button>
+              ))}
+              {rating && (
+                <button
+                  onClick={() => setRating('')}
+                  className="mt-1 self-start text-sm font-bold text-emerald-700 hover:underline"
+                >
+                  Tampilkan semua rating
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* DAFTAR REVIEW */}
+          <div className="space-y-4">
+            {tampil.map((b) => (
+              <div key={b.review.review_id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-extrabold text-slate-900">{b.pemesan.nama}</p>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {b.kos.nama_kos}, kamar {b.kamar.no_kamar}
                     </p>
-                    <Bintang nilai={Math.round(review.rata || 0)} />
-                    <p className="mt-1 text-xs text-slate-500">{review.jumlah} ulasan</p>
                   </div>
-                  <div className="min-w-0 flex-1 border-l border-slate-100 pl-6">
-                    <h2 className="text-lg font-extrabold text-slate-900">
-                      {kosTerpilih?.nama_kos || '-'}
-                    </h2>
-                    <p className="text-sm text-slate-500">
-                      Rating rata-rata dihitung dari seluruh review kos ini.
-                    </p>
+                  <div className="text-right">
+                    <Bintang nilai={b.review.rating} />
+                    <p className="mt-1 text-xs font-medium text-slate-500">{formatWaktu(b.review.dibuat_pada)}</p>
                   </div>
                 </div>
 
-                {memuat ? (
-                  <p className="py-12 text-center text-slate-500">Memuat review…</p>
-                ) : review.data.length === 0 ? (
-                  <Kosong
-                    judul="Belum ada review"
-                    deskripsi="Review muncul setelah pencari kos menyelesaikan bookingnya."
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {review.data.map((r) => (
-                      <article
-                        key={r.review_id}
-                        className="rounded-2xl border border-slate-200 bg-white p-5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
-                              {(r.pemberi_review || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">
-                                {r.pemberi_review || 'Pencari kos'}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                Kamar {r.kamar || '-'} ·{' '}
-                                {r.dibuat_pada
-                                  ? new Date(r.dibuat_pada).toLocaleDateString('id-ID')
-                                  : '-'}
-                              </p>
-                            </div>
-                          </div>
-                          <Bintang nilai={r.rating} kecil />
-                        </div>
-                        {r.komentar ? (
-                          <p className="mt-4 text-sm leading-relaxed text-slate-700">"{r.komentar}"</p>
-                        ) : (
-                          <p className="mt-4 inline-flex items-center gap-2 text-xs italic text-slate-400">
-                            <StarOff className="h-3.5 w-3.5" /> Tidak ada komentar
-                          </p>
-                        )}
-                      </article>
-                    ))}
+                <p className="mt-4 text-base leading-relaxed text-slate-800">
+                  {b.review.komentar || <span className="italic text-slate-400">Tidak ada komentar</span>}
+                </p>
+              </div>
+            ))}
 
-                    {review.totalHalaman > 1 && (
-                      <div className="flex items-center justify-center gap-4 pt-2">
-                        <button
-                          onClick={() => setHalaman((h) => Math.max(1, h - 1))}
-                          disabled={halaman <= 1}
-                          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40"
-                        >
-                          Sebelumnya
-                        </button>
-                        <span className="text-sm font-semibold text-slate-600">
-                          Halaman {halaman} / {review.totalHalaman}
-                        </span>
-                        <button
-                          onClick={() =>
-                            setHalaman((h) => Math.min(review.totalHalaman || BATAL, h + 1))
-                          }
-                          disabled={halaman >= (review.totalHalaman || BATAL)}
-                          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40"
-                        >
-                          Berikutnya
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
+            {tampil.length === 0 && (
+              <DataKosong
+                judul={data.length === 0 ? 'Belum ada review' : 'Tidak ada review yang cocok'}
+                deskripsi={
+                  data.length === 0
+                    ? 'Review muncul setelah pencari kos menyelesaikan booking dan memberi penilaian.'
+                    : 'Coba ganti filter kos atau rating.'
+                }
+              />
             )}
-          </>
-        )}
-      </div>
-    </div>
+          </div>
+        </>
+      )}
+    </HalamanOwner>
   );
 }

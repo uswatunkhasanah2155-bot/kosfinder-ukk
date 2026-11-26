@@ -1,291 +1,287 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Check, ClipboardList, Download, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Download, MessageCircle } from 'lucide-react';
 import api from '../../api/axios';
-import { BadgeStatus, Konfirmasi, Kosong, Pesan } from '../../components/ui';
-import { rupiah } from '../../utils/kos';
+import { HalamanOwner, Notif, GalatBox, DataKosong, Badge } from '../../components/owner/Ui';
+import {
+  kelasInput,
+  kelasSelect,
+  rupiah,
+  formatTanggal,
+  formatWaktu,
+  linkWa,
+  pesanGalat,
+  unduhFile,
+} from '../../utils/ownerHelper';
 
-const STATUS = ['', 'Menunggu', 'Disetujui', 'Ditolak', 'Selesai'];
+// GET   /api/owner/booking                 semua booking di kos milik Owner
+// PATCH /api/booking/:id/setujui           Menunggu -> Disetujui
+// PATCH /api/booking/:id/tolak             Menunggu -> Ditolak
+// PATCH /api/booking/:id/selesai           Disetujui -> Selesai
+// GET   /api/booking/:id/bukti             bukti konfirmasi (PDF), untuk Disetujui / Selesai
 
-const tanggalPendek = (s) => {
-  if (!s) return '-';
-  const t = String(s).slice(0, 10);
-  return `${t.slice(8, 10)}/${t.slice(5, 7)}/${t.slice(0, 4)}`;
-};
+const TAB = ['Semua', 'Menunggu', 'Disetujui', 'Selesai', 'Ditolak'];
+const WARNA_STATUS = { Menunggu: 'kuning', Disetujui: 'hijau', Selesai: 'biru', Ditolak: 'merah' };
 
-const unduhFile = (blob, namaFile) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = namaFile;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
+const tombolKecil =
+  'rounded-xl px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function BookingMasuk() {
-  const [daftar, setDaftar] = useState([]);
+  const [data, setData] = useState([]);
   const [daftarKos, setDaftarKos] = useState([]);
-  const [filter, setFilter] = useState({ status: 'Menunggu', kos_id: '' });
-  const [memuat, setMemuat] = useState(true);
-  const [pesan, setPesan] = useState(null);
-  const [konfirmasi, setKonfirmasi] = useState(null);
-  const [memproses, setMemproses] = useState(false);
-  const [mengunduh, setMengunduh] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [errorAksi, setErrorAksi] = useState('');
+  const [prosesId, setProsesId] = useState(null);
 
-  const muat = useCallback(() => {
-    setMemuat(true);
-    const params = Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== ''));
-    return api
-      .get('/owner/booking', { params })
-      .then((res) => setDaftar(res.data.data ?? []))
-      .catch(() => setPesan({ tipe: 'galat', teks: 'Gagal memuat data booking.' }))
-      .finally(() => setMemuat(false));
-  }, [filter]);
+  // Tab mengikuti URL supaya tautan /owner/booking?tab=Disetujui dari Dashboard berfungsi
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get('tab');
+  const tab = TAB.includes(tabParam) ? tabParam : 'Menunggu';
 
-  useEffect(() => {
-    let batal = false;
-    queueMicrotask(() => {
-      api
-        .get('/kos/saya')
-        .then((res) => {
-          if (!batal) setDaftarKos(res.data.data ?? []);
-        })
-        .catch(() => {});
-    });
-    return () => {
-      batal = true;
-    };
+  const gantiTab = (t) => {
+    const next = new URLSearchParams(params);
+    if (t === 'Menunggu') next.delete('tab');
+    else next.set('tab', t);
+    setParams(next, { replace: true });
+  };
+
+  const [kosId, setKosId] = useState('');
+  const [cari, setCari] = useState('');
+
+  const muatData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get('/owner/booking');
+      setData(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal memuat data booking');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    let batal = false;
-    queueMicrotask(() => {
-      setMemuat(true);
-      const params = Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== ''));
-      api
-        .get('/owner/booking', { params })
-        .then((res) => {
-          if (!batal) setDaftar(res.data.data ?? []);
-        })
-        .catch(() => {
-          if (!batal) setPesan({ tipe: 'galat', teks: 'Gagal memuat data booking.' });
-        })
-        .finally(() => {
-          if (!batal) setMemuat(false);
-        });
+    muatData();
+  }, [muatData]);
+
+  useEffect(() => {
+    api
+      .get('/kos/saya')
+      .then((res) => setDaftarKos(res.data.data))
+      .catch(() => setDaftarKos([]));
+  }, []);
+
+  const hitungTab = useMemo(() => {
+    const hasil = { Semua: data.length };
+    TAB.slice(1).forEach((t) => {
+      hasil[t] = data.filter((b) => b.status_booking === t).length;
     });
-    return () => {
-      batal = true;
-    };
-  }, [filter]);
+    return hasil;
+  }, [data]);
 
-  const ubah = (e) => setFilter((f) => ({ ...f, [e.target.name]: e.target.value }));
+  const tampil = useMemo(() => {
+    const q = cari.trim().toLowerCase();
+    return data.filter(
+      (b) =>
+        (tab === 'Semua' || b.status_booking === tab) &&
+        (!kosId || b.kos.kos_id === Number(kosId)) &&
+        (!q || b.pemesan.nama.toLowerCase().includes(q) || b.kode_booking.toLowerCase().includes(q))
+    );
+  }, [data, tab, kosId, cari]);
 
-  const jalankanAksi = async () => {
-    const { booking, aksi } = konfirmasi;
-    setMemproses(true);
+  const proses = async (b, aksi) => {
+    setProsesId(b.booking_id);
+    setErrorAksi('');
     try {
-      const res = await api.patch(`/booking/${booking.booking_id}/${aksi}`);
-      setPesan({ tipe: 'sukses', teks: res.data.message || 'Status booking berhasil diperbarui.' });
-      setKonfirmasi(null);
-      await muat();
+      const res = await api.patch(`/booking/${b.booking_id}/${aksi}`);
+      setPesan(res.data.message);
+      await muatData();
     } catch (err) {
-      setPesan({ tipe: 'galat', teks: err.response?.data?.message || 'Gagal memproses booking.' });
-      setKonfirmasi(null);
+      setErrorAksi(err.response?.data?.message || 'Gagal memproses booking');
     } finally {
-      setMemproses(false);
+      setProsesId(null);
     }
   };
 
   const unduhBukti = async (b) => {
-    setMengunduh(b.booking_id);
+    setProsesId(b.booking_id);
+    setErrorAksi('');
     try {
-      const res = await api.get(`/booking/${b.booking_id}/bukti`, { responseType: 'blob' });
-      unduhFile(res.data, `bukti-${b.kode_booking}.pdf`);
-    } catch {
-      setPesan({ tipe: 'galat', teks: 'Bukti konfirmasi belum bisa diunduh.' });
+      await unduhFile(`/booking/${b.booking_id}/bukti`, {}, `bukti-${b.kode_booking}.pdf`);
+    } catch (err) {
+      setErrorAksi(await pesanGalat(err, 'Gagal mengunduh bukti konfirmasi'));
     } finally {
-      setMengunduh(null);
+      setProsesId(null);
     }
   };
 
-  const infoAksi = konfirmasi && {
-    setujui: {
-      judul: 'Setujui booking?',
-      pesan: `Booking ${konfirmasi.booking.kode_booking} akan disetujui. Status kamar akan berubah menjadi "Dalam Booking".`,
-      label: 'Setujui',
-    },
-    tolak: {
-      judul: 'Tolak booking?',
-      pesan: `Booking ${konfirmasi.booking.kode_booking} akan ditolak. Pemesan akan melihat status Ditolak.`,
-      label: 'Tolak',
-      berbahaya: true,
-    },
-    selesai: {
-      judul: 'Tandai selesai?',
-      pesan: `Booking ${konfirmasi.booking.kode_booking} akan ditandai Selesai dan kamar kembali menjadi Kosong.`,
-      label: 'Tandai Selesai',
-    },
-  }[konfirmasi.aksi];
-
   return (
-    <div className="min-h-screen bg-slate-50/70 p-6 md:p-10">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 md:text-3xl">Booking Masuk</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Periksa pengajuan survey dan sewa kamar, lalu setujui atau tolak.
-          </p>
-        </div>
+    <HalamanOwner
+      label="Transaksi"
+      judul="Booking Masuk"
+      deskripsi="Pengajuan survey dan sewa kamar dari pencari kos. Setujui atau tolak, lalu tandai selesai setelah masanya berakhir."
+    >
+      <Notif pesan={pesan} onTutup={() => setPesan('')} />
+      <GalatBox pesan={error} onCoba={muatData} />
+      <GalatBox pesan={errorAksi} onTutup={() => setErrorAksi('')} />
 
-        <Pesan pesan={pesan} onTutup={() => setPesan(null)} />
+      {/* TAB STATUS */}
+      <div className="flex flex-wrap gap-2">
+        {TAB.map((t) => (
+          <button
+            key={t}
+            onClick={() => gantiTab(t)}
+            className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
+              tab === t
+                ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                : 'border-slate-300 bg-white text-slate-700 hover:border-emerald-500'
+            }`}
+          >
+            {t} <span className={tab === t ? 'text-emerald-100' : 'text-slate-400'}>({hitungTab[t]})</span>
+          </button>
+        ))}
+      </div>
 
-        <div className="flex flex-wrap gap-4 rounded-3xl border border-slate-200 bg-white p-5">
-          <label className="min-w-45 flex-1">
-            <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
-              Status booking
-            </span>
-            <select
-              name="status"
-              value={filter.status}
-              onChange={ubah}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800"
-            >
-              {STATUS.map((s) => (
-                <option key={s} value={s}>
-                  {s || 'Semua status'}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-45 flex-1">
-            <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
-              Kos
-            </span>
-            <select
-              name="kos_id"
-              value={filter.kos_id}
-              onChange={ubah}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800"
-            >
-              <option value="">Semua kos</option>
-              {daftarKos.map((k) => (
-                <option key={k.kos_id} value={k.kos_id}>
-                  {k.nama_kos}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {memuat ? (
-          <p className="py-16 text-center text-slate-500">Memuat data booking…</p>
-        ) : daftar.length === 0 ? (
-          <Kosong
-            judul="Tidak ada booking"
-            deskripsi="Belum ada pengajuan booking yang cocok dengan filter ini."
+      {/* PENCARIAN & FILTER KOS */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+            placeholder="Cari nama pemesan atau kode booking"
+            className={`${kelasInput} py-3.5 pl-12`}
           />
-        ) : (
-          <div className="space-y-4">
-            {daftar.map((b) => (
-              <article
-                key={b.booking_id}
-                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold tracking-wide text-emerald-700">
-                      {b.kode_booking}
-                    </p>
-                    <h2 className="mt-1 text-lg font-extrabold text-slate-900">
-                      {b.kos?.nama_kos || '-'}
-                    </h2>
-                    <p className="text-sm text-slate-500">
-                      Kamar {b.kamar?.no_kamar || '-'} · {b.kamar?.tipe_kamar || '-'}
-                    </p>
-                  </div>
-                  <BadgeStatus status={b.status_booking} />
-                </div>
+        </div>
+        <select
+          value={kosId}
+          onChange={(e) => setKosId(e.target.value)}
+          className={`${kelasSelect} sm:w-64`}
+          aria-label="Filter kos"
+        >
+          <option value="">Semua kos</option>
+          {daftarKos.map((k) => (
+            <option key={k.kos_id} value={k.kos_id}>
+              {k.nama_kos}
+            </option>
+          ))}
+        </select>
+      </div>
 
-                <div className="mt-5 grid gap-3 border-t border-slate-100 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-slate-500">Pemesan</p>
-                    <p className="font-bold text-slate-800">{b.pemesan?.nama || '-'}</p>
-                    <p className="text-xs text-slate-500">{b.pemesan?.no_wa || '-'}</p>
+      {loading && (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-200/70" />
+          ))}
+        </div>
+      )}
+
+      {/* DAFTAR BOOKING */}
+      {!loading && (
+        <div className="space-y-4">
+          {tampil.map((b) => {
+            const sibuk = prosesId === b.booking_id;
+            const wa = linkWa(b.pemesan.no_wa);
+            const jenisKamar = b.jenis_booking === 'Kamar';
+            return (
+              <div
+                key={b.booking_id}
+                className="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-emerald-300 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <p className="text-lg font-extrabold text-slate-900">{b.pemesan.nama}</p>
+                    <Badge warna={WARNA_STATUS[b.status_booking]}>{b.status_booking}</Badge>
+                    <Badge warna={jenisKamar ? 'hijau' : 'abu'}>{b.jenis_booking}</Badge>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Jenis booking</p>
-                    <p className="font-bold text-slate-800">{b.jenis_booking}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Tanggal</p>
-                    <p className="font-bold text-slate-800">{tanggalPendek(b.tanggal_survey)}</p>
-                    {b.jenis_booking === 'Kamar' && (
-                      <p className="text-xs text-slate-500">{b.durasi_bulan} bulan</p>
+
+                  <p className="text-base text-slate-700">
+                    {b.kos.nama_kos}, kamar <strong>{b.kamar.no_kamar}</strong> ({b.kamar.tipe_kamar}) -{' '}
+                    {jenisKamar
+                      ? `sewa ${b.durasi_bulan} bulan mulai ${formatTanggal(b.tanggal_survey)}`
+                      : `survey ${formatTanggal(b.tanggal_survey)}`}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500">
+                    <span className="font-semibold">{b.kode_booking}</span>
+                    <span>Diajukan {formatWaktu(b.dibuat_pada)}</span>
+                    {jenisKamar && (
+                      <span className="font-bold text-slate-800">Total {rupiah(b.total_biaya)}</span>
+                    )}
+                    {wa && (
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 font-bold text-emerald-700 hover:underline"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {b.pemesan.no_wa}
+                      </a>
                     )}
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Total biaya</p>
-                    <p className="font-bold text-emerald-700">
-                      {b.total_biaya ? rupiah(b.total_biaya) : '-'}
-                    </p>
-                  </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
                   {b.status_booking === 'Menunggu' && (
                     <>
                       <button
-                        onClick={() => setKonfirmasi({ booking: b, aksi: 'setujui' })}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+                        onClick={() => proses(b, 'tolak')}
+                        disabled={sibuk}
+                        className={`${tombolKecil} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
                       >
-                        <Check className="h-4 w-4" /> Setujui
+                        Tolak
                       </button>
                       <button
-                        onClick={() => setKonfirmasi({ booking: b, aksi: 'tolak' })}
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-100"
+                        onClick={() => proses(b, 'setujui')}
+                        disabled={sibuk}
+                        className={`${tombolKecil} bg-emerald-600 text-white hover:bg-emerald-700`}
                       >
-                        <X className="h-4 w-4" /> Tolak
+                        Setujui
                       </button>
                     </>
                   )}
+
                   {b.status_booking === 'Disetujui' && (
                     <button
-                      onClick={() => setKonfirmasi({ booking: b, aksi: 'selesai' })}
-                      className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-900"
+                      onClick={() => proses(b, 'selesai')}
+                      disabled={sibuk}
+                      className={`${tombolKecil} border border-emerald-600 bg-white text-emerald-700 hover:bg-emerald-50`}
                     >
-                      <ClipboardList className="h-4 w-4" /> Tandai Selesai
+                      Tandai selesai
                     </button>
                   )}
+
                   {['Disetujui', 'Selesai'].includes(b.status_booking) && (
                     <button
                       onClick={() => unduhBukti(b)}
-                      disabled={mengunduh === b.booking_id}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      disabled={sibuk}
+                      className={`${tombolKecil} inline-flex items-center gap-1.5 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
                     >
                       <Download className="h-4 w-4" />
-                      {mengunduh === b.booking_id ? 'Mengunduh…' : 'Unduh bukti'}
+                      Bukti PDF
                     </button>
                   )}
                 </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
+              </div>
+            );
+          })}
 
-      {konfirmasi && infoAksi && (
-        <Konfirmasi
-          judul={infoAksi.judul}
-          pesan={infoAksi.pesan}
-          onBatal={() => setKonfirmasi(null)}
-          onYa={jalankanAksi}
-          memproses={memproses}
-          berbahaya={infoAksi.berbahaya}
-          labelYa={infoAksi.label}
-        />
+          {!error && tampil.length === 0 && (
+            <DataKosong
+              judul={data.length === 0 ? 'Belum ada booking' : 'Tidak ada booking yang cocok'}
+              deskripsi={
+                data.length === 0
+                  ? 'Pengajuan dari pencari kos akan muncul di sini.'
+                  : 'Coba ganti tab status, kos, atau kata kunci.'
+              }
+            />
+          )}
+        </div>
       )}
-    </div>
+    </HalamanOwner>
   );
 }

@@ -6,7 +6,7 @@ import {
   Lock, X, LogIn, UserPlus, ShieldCheck, Wallet, MapPinned, ChevronDown, Check, LocateFixed, Images,
 } from 'lucide-react';
 import api from '../../api/axios';
-import { useAuth } from '../../context/authHooks';
+import { useAuth } from '../../context/AuthContext';
 import PublicNavbar from '../../components/PublicNavbar';
 import FotoKos from '../../components/FotoKos';
 import PetaKos from '../../components/map/PetaKos';

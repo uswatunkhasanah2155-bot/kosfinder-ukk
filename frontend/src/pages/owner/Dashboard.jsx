@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -80,10 +80,17 @@ const IKON = {
     'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
 };
 
-function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
+function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false, to }) {
+  // Jika `to` diisi, seluruh kartu menjadi tautan ke halaman terkait
+  const Pembungkus = to ? Link : 'div';
   return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+    <Pembungkus
+      {...(to ? { to } : {})}
+      className={`group relative block overflow-hidden rounded-2xl border p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+        to
+          ? 'cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/25'
+          : ''
+      } ${
         sorot
           ? 'border-emerald-300 bg-emerald-50/50'
           : 'border-slate-200 bg-white'
@@ -92,24 +99,29 @@ function KartuStatistik({ judul, nilai, keterangan, ikon, sorot = false }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-wide text-slate-600">{judul}</p>
-          <p className="mt-2.5 break-words text-3xl font-extrabold tracking-tight text-slate-900">
+          <p className="mt-2.5 wrap-break-word text-3xl font-extrabold tracking-tight text-slate-900">
             {nilai ?? 0}
           </p>
           {keterangan && (
             <p className="mt-2 text-xs font-medium text-slate-500">{keterangan}</p>
+          )}
+          {to && (
+            <p className="mt-3 text-xs font-bold text-emerald-700 transition-transform duration-200 group-hover:translate-x-1">
+              Lihat detail →
+            </p>
           )}
         </div>
         <div
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-colors duration-200 ${
             sorot
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-50 group-hover:text-emerald-700'
+              : 'bg-slate-100 text-slate-700 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-sm'
           }`}
         >
           {ikon}
         </div>
       </div>
-    </div>
+    </Pembungkus>
   );
 }
 
@@ -139,6 +151,7 @@ function SkeletonDashboard() {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState(filterAwal);
   const [wilayah, setWilayah] = useState([]);
   const [data, setData] = useState(null);
@@ -339,24 +352,28 @@ export default function Dashboard() {
                 nilai={`${r.okupansi_persen}%`}
                 keterangan={`${r.kamar_terisi} dari ${r.total_kamar} kamar terisi`}
                 sorot
+                to="/owner/kamar"
                 ikon={<Ikon d={IKON.rumah} />}
               />
               <KartuStatistik
                 judul="Booking Menunggu"
                 nilai={booking.length}
                 keterangan="Perlu disetujui atau ditolak"
+                to="/owner/booking"
                 ikon={<Ikon d={IKON.jam} />}
               />
               <KartuStatistik
                 judul={tahunBerjalan ? 'Pendapatan Bulan Ini' : `Pendapatan ${filter.tahun}`}
                 nilai={rupiahRingkas(pendapatanTampil)}
                 keterangan={`${rupiah(pendapatanTampil)} (estimasi)`}
+                to="/owner/booking?tab=Disetujui"
                 ikon={<Ikon d={IKON.uang} />}
               />
               <KartuStatistik
                 judul="Rating Rata-rata"
                 nilai={rating.rata === null ? '-' : String(rating.rata).replace('.', ',')}
                 keterangan={`${rating.jumlah} review`}
+                to="/owner/review"
                 ikon={<Ikon d={IKON.bintang} />}
               />
             </div>
@@ -368,7 +385,7 @@ export default function Dashboard() {
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Okupansi Kamar</h3>
-                    <p className="mt-1 text-sm text-slate-500">Persentase kamar terisi per kos</p>
+                    <p className="mt-1 text-sm text-slate-500">Persentase kamar terisi per kos. Klik batang untuk mengelola kamarnya.</p>
                   </div>
                   <span className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                     {data.okupansi_per_kos.length} Kos
@@ -395,6 +412,17 @@ export default function Dashboard() {
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
+                        onClick: (_, elemen) => {
+                          if (elemen.length) {
+                            const k = data.okupansi_per_kos[elemen[0].index];
+                            navigate(`/owner/kamar?kos=${k.kos_id}`);
+                          }
+                        },
+                        onHover: (e, elemen) => {
+                          if (e?.native?.target) {
+                            e.native.target.style.cursor = elemen.length ? 'pointer' : 'default';
+                          }
+                        },
                         plugins: {
                           legend: { display: false },
                           tooltip: {
@@ -433,7 +461,7 @@ export default function Dashboard() {
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">Estimasi Pendapatan</h3>
-                    <p className="mt-1 text-sm text-slate-500">Pendapatan sewa kamar per bulan</p>
+                    <p className="mt-1 text-sm text-slate-500">Pendapatan sewa kamar per bulan. Klik grafik untuk melihat booking yang disetujui.</p>
                   </div>
                   <span className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                     Jan – Des
@@ -463,6 +491,10 @@ export default function Dashboard() {
                       responsive: true,
                       maintainAspectRatio: false,
                       interaction: { mode: 'index', intersect: false },
+                      onClick: () => navigate('/owner/booking?tab=Disetujui'),
+                      onHover: (e) => {
+                        if (e?.native?.target) e.native.target.style.cursor = 'pointer';
+                      },
                       plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -495,7 +527,7 @@ export default function Dashboard() {
                   <h3 className="text-lg font-bold text-slate-900">Booking Masuk</h3>
                   <p className="mt-1 text-sm text-slate-500">Pengajuan yang menunggu keputusan Anda</p>
                 </div>
-                {booking.length > 5 && (
+                {booking.length > 0 && (
                   <Link to="/owner/booking" className="text-sm font-bold text-[#0d5a57] hover:underline">
                     Lihat semua ({booking.length})
                   </Link>
