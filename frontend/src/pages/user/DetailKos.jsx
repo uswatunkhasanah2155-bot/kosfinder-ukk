@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // wajib: tanpa ini peta tidak bisa digeser/di-zoom dengan benar
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Images, Info, Lock, LogIn, MapPin, Star, UserPlus, X } from 'lucide-react';
 import api from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authHooks';
 import PublicNavbar from '../../components/PublicNavbar';
 import FotoKos from '../../components/FotoKos';
 import { normalisasi, rupiah, fotoUrl } from '../../utils/kos';

@@ -7,7 +7,7 @@ import {
   LogOut, MapPin, Search, Star, X, XCircle,
 } from 'lucide-react';
 import api from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/authHooks';
 import PublicNavbar from '../../components/PublicNavbar';
 import { normalisasi, rupiah } from '../../utils/kos';
 
