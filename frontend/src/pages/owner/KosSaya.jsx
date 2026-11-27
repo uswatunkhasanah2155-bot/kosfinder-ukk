@@ -12,6 +12,7 @@ import {
   tombolBahaya,
   rupiah,
 } from '../../utils/ownerHelper';
+import { fotoUrl } from '../../utils/kos';
 
 // GET    /api/kos/saya             daftar kos milik Owner (semua status)
 // GET    /api/fasilitas            pilihan fasilitas
@@ -364,7 +365,7 @@ export default function KosSaya() {
               >
                 <div className="relative h-44 bg-slate-100">
                   {k.foto_utama ? (
-                    <img src={k.foto_utama} alt={k.nama_kos} className="h-full w-full object-cover" />
+                    <img src={fotoUrl(k.foto_utama)} alt={k.nama_kos} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">
                       Belum ada foto
@@ -591,7 +592,7 @@ export default function KosSaya() {
                     key={f.foto_id}
                     className="relative h-20 w-20 overflow-hidden rounded-xl border border-slate-300"
                   >
-                    <img src={f.url} alt="Foto kos" className="h-full w-full object-cover" />
+                    <img src={fotoUrl(f.url || f.path_foto)} alt="Foto kos" className="h-full w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setFotoHapus((h) => [...h, f.foto_id])}

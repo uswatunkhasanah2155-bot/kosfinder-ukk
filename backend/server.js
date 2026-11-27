@@ -1,9 +1,9 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 import authRoutes from './services/auth-service/auth.js';
 import fasilitasRoutes from './services/fasilitas-service/fasilitas.js';
@@ -18,6 +18,15 @@ import exportRoutes from './services/export-service/export.js';
 import { selesaikanBookingKedaluwarsa } from './lib/bookingOtomatis.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Pastikan folder uploads tersedia di backend
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -92,6 +101,9 @@ app.use(
     message: pesanTerlaluBanyak,
   })
 );
+
+// Akses file statis untuk folder uploads (foto kos)
+app.use('/uploads', express.static(uploadDir));
 
 // Route Autentikasi (Register, Login, Me)
 app.use('/api/auth', authRoutes);

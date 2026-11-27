@@ -1,10 +1,6 @@
 // src/utils/kos.js
 import api from '../api/axios';
 
-// Isi di frontend/.env  ->  VITE_CLOUDINARY_CLOUD_NAME=nama_cloud_anda
-// (hanya dipakai bila database menyimpan public_id, bukan alamat penuh)
-const CLOUD = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-
 // Sesuaikan nama field di sini saja bila respons backend Anda berbeda.
 export const normalisasi = (k) => {
   const fotos = [
@@ -38,25 +34,17 @@ export const rupiah = (n) => 'Rp' + Number(n).toLocaleString('id-ID');
 export const fmtJarak = (j) => (j < 1 ? `${Math.round(j * 1000)} m` : `${j.toFixed(1)} km`);
 
 /**
- * Ubah nilai foto dari database menjadi URL yang bisa dibuka browser.
- *  1) Alamat penuh (https://res.cloudinary.com/...)  -> dipakai apa adanya
- *  2) Path lokal "uploads/..."                       -> dari server backend
- *  3) Selain itu + VITE_CLOUDINARY_CLOUD_NAME ada    -> dianggap public_id Cloudinary
- * lebar (opsional): minta Cloudinary mengecilkan gambar (hemat kuota, lebih cepat)
+ * Ubah path foto dari database menjadi URL yang bisa dibuka browser.
+ * - Alamat penuh (http:// atau https://) -> dipakai apa adanya
+ * - Path lokal ("uploads/..." atau "/uploads/...") -> diarahkan ke backend server
  */
-export const fotoUrl = (path, lebar) => {
+export const fotoUrl = (path) => {
   if (!path) return null;
-  let url;
-  if (/^https?:/.test(path)) {
-    url = path;
-  } else if (/^\/?uploads\//.test(path) || !CLOUD) {
-    const base = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-    return `${base}/${path.replace(/^\//, '')}`;
-  } else {
-    url = `https://res.cloudinary.com/${CLOUD}/image/upload/${path.replace(/^\//, '')}`;
+  if (/^https?:/i.test(path)) {
+    return path;
   }
-  if (lebar && url.includes('res.cloudinary.com') && url.includes('/upload/')) {
-    url = url.replace('/upload/', `/upload/w_${lebar},c_limit,q_auto,f_auto/`);
-  }
-  return url;
+  const base = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+  const clean = path.replace(/^\/+/, '');
+  const rel = clean.startsWith('uploads/') ? clean : `uploads/${clean}`;
+  return `${base}/${rel}`;
 };

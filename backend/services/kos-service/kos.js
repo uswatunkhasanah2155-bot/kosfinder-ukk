@@ -1,8 +1,14 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import prisma from '../../lib/prisma.js';
-import upload from '../../middleware/upload.js';
-import { uploadFoto, hapusFoto } from '../../lib/cloudinary.js';
-import { verifyToken, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
+import upload, { hapusFoto } from '../../middleware/upload.js';
+import { verifyToken, checkRole, verifyOwnerVerified } from '../../middleware/authMiddleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.resolve(__dirname, '..', '..', 'uploads');
 
 const router = express.Router();
 
@@ -20,8 +26,9 @@ const ownerTerverifikasi = [verifyToken, verifyOwnerVerified];
 const fotoUrl = (p) => {
   if (!p) return null;
   if (/^https?:\/\//i.test(p)) return p;
-  if (/^\/?uploads\//.test(p)) return `/${p.replace(/^\/+/, '')}`; // data lama (lokal)
-  return `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/${p}`;
+  const clean = p.replace(/^\/+/, '');
+  if (/^uploads\//.test(clean)) return `/${clean}`;
+  return `/uploads/${clean}`;
 };
 
 const kosong = (v) => v === undefined || v === null || v === '';
@@ -502,7 +509,7 @@ router.delete('/:id', ownerTerverifikasi, async (req, res) => {
     // Kamar, foto, dan relasi fasilitas ikut terhapus (onDelete: Cascade)
     await prisma.kos.delete({ where: { kos_id: id } });
 
-    // Hapus file di Cloudinary setelah data database aman terhapus
+    // Hapus file foto lokal setelah data database aman terhapus
     await Promise.all(foto.map((f) => hapusFoto(f.path_foto)));
 
     res.json({ success: true, message: 'Berhasil menghapus kos' });
@@ -535,15 +542,31 @@ const terimaFoto = (req, res, next) => {
   });
 };
 
-router.post('/:id/foto', ownerTerverifikasi, terimaFoto, async (req, res) => {
-  let terunggah = [];
+// Bersihkan file yang baru diunggah oleh multer jika ada kegagalan validasi atau error database
+const bersihkanFileBaru = (files) => {
+  if (!files?.length) return;
+  files.forEach((f) => {
+    if (f.path && fs.existsSync(f.path)) {
+      try {
+        fs.unlinkSync(f.path);
+      } catch (e) {
+        console.error('Gagal membersihkan file baru:', f.path, e.message);
+      }
+    }
+  });
+};
 
+router.post('/:id/foto', ownerTerverifikasi, terimaFoto, async (req, res) => {
   try {
     const id = parseId(req.params.id);
-    if (!id) return res.status(400).json({ success: false, message: 'ID tidak valid' });
+    if (!id) {
+      bersihkanFileBaru(req.files);
+      return res.status(400).json({ success: false, message: 'ID tidak valid' });
+    }
 
     const milik = await cariKosMilik(id, req.user.user_id);
     if (!milik) {
+      bersihkanFileBaru(req.files);
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
@@ -553,16 +576,21 @@ router.post('/:id/foto', ownerTerverifikasi, terimaFoto, async (req, res) => {
 
     const sudahAda = await prisma.fotoKos.count({ where: { kos_id: id } });
     if (sudahAda + req.files.length > MAKS_FOTO_PER_KOS) {
+      bersihkanFileBaru(req.files);
       return res.status(400).json({
         success: false,
         message: `Maksimal ${MAKS_FOTO_PER_KOS} foto per kos (saat ini ${sudahAda})`,
       });
     }
 
-    terunggah = await Promise.all(req.files.map((f) => uploadFoto(f, 'kos')));
+    // Simpan path relatif "uploads/nama-file.ext" ke database
+    const dataFoto = req.files.map((f) => ({
+      kos_id: id,
+      path_foto: `uploads/${f.filename}`,
+    }));
 
     await prisma.fotoKos.createMany({
-      data: terunggah.map((path_foto) => ({ kos_id: id, path_foto })),
+      data: dataFoto,
     });
 
     const foto = await prisma.fotoKos.findMany({ where: { kos_id: id }, orderBy: { foto_id: 'asc' } });
@@ -575,8 +603,8 @@ router.post('/:id/foto', ownerTerverifikasi, terimaFoto, async (req, res) => {
   } catch (error) {
     console.error('ERROR UPLOAD FOTO KOS:', error);
 
-    // Bersihkan file yang sudah terlanjur masuk Cloudinary
-    await Promise.all(terunggah.map((p) => hapusFoto(p)));
+    // Bersihkan file lokal yang baru saja disimpan oleh multer jika database gagal
+    bersihkanFileBaru(req.files);
 
     res.status(500).json({
       success: false,

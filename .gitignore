@@ -149,3 +149,8 @@ vite.config.ts.timestamp-*
 .turbo
 "backend.zip" 
 backend.zip 
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
