@@ -151,6 +151,5 @@ vite.config.ts.timestamp-*
 backend.zip 
 
 # Uploads
-backend/uploads/*
 !backend/uploads/.gitkeep
 

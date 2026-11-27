@@ -37,12 +37,34 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Middleware
+// origin harus disebut spesifik (bukan '*') karena frontend mengirim request dengan credentials.
+// Alamat tambahan bisa diisi lewat FRONTEND_URL di .env, dipisah koma.
+const originDiizinkan = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()) : []),
+];
+
 // exposedHeaders: agar frontend bisa membaca nama file dari header Content-Disposition saat unduh
-app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
+app.use(
+  cors({
+    origin: originDiizinkan,
+    credentials: true,
+    exposedHeaders: ['Content-Disposition'],
+  })
+);
 app.use(express.json());
 
 // Akses file statis untuk folder uploads (foto kos)
-app.use('/uploads', express.static(uploadDir));
+// Cross-Origin-Resource-Policy: agar gambar bisa dimuat oleh frontend di port berbeda
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(uploadDir)
+);
 
 // Route Autentikasi (Register, Login, Me)
 app.use('/api/auth', authRoutes);
