@@ -28,7 +28,8 @@ const fotoUrl = (p) => {
   if (/^https?:\/\//i.test(p)) return p;
   const clean = p.replace(/^\/+/, '');
   if (/^uploads\//.test(clean)) return `/${clean}`;
-  return `/uploads/${clean}`;
+  // Fallback data foto lama dari Cloudinary
+  return `https://res.cloudinary.com/mratyocs/image/upload/${clean}`;
 };
 
 const kosong = (v) => v === undefined || v === null || v === '';
@@ -637,7 +638,7 @@ router.delete('/foto/:fotoId', ownerTerverifikasi, async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Gagal menghapus foto'
+            message: 'Gagal menghapus foto'
     });
   }
 });

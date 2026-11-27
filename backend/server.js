@@ -53,8 +53,12 @@ const pesanTerlaluBanyak = {
   message: 'Terlalu banyak permintaan. Silakan coba beberapa saat lagi.',
 };
 
-// Middleware keamanan dasar
-app.use(helmet());
+// Middleware keamanan dasar (izinkan resource gambar diakses cross-origin oleh frontend)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
 // exposedHeaders: agar frontend bisa membaca nama file dari header Content-Disposition saat unduh
 app.use(
@@ -105,8 +109,18 @@ app.use(
   })
 );
 
-// Akses file statis untuk folder uploads (foto kos)
-app.use('/uploads', express.static(uploadDir));
+// Akses file statis untuk folder uploads (foto kos).
+// Helmet mengirim Cross-Origin-Resource-Policy: same-origin secara default,
+// sehingga gambar diblokir browser saat frontend beda origin (mis. :5173 -> :5000).
+// Di sini header itu ditimpa menjadi cross-origin khusus untuk /uploads saja.
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(uploadDir)
+);
 
 // Route Autentikasi (Register, Login, Me)
 app.use('/api/auth', authRoutes);

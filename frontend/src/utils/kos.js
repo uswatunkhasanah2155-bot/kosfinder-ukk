@@ -37,14 +37,18 @@ export const fmtJarak = (j) => (j < 1 ? `${Math.round(j * 1000)} m` : `${j.toFix
  * Ubah path foto dari database menjadi URL yang bisa dibuka browser.
  * - Alamat penuh (http:// atau https://) -> dipakai apa adanya
  * - Path lokal ("uploads/..." atau "/uploads/...") -> diarahkan ke backend server
+ * - Path lama sebelum migrasi ("kos/...") -> diarahkan ke Cloudinary agar foto lama tetap tampil
  */
 export const fotoUrl = (path) => {
   if (!path) return null;
   if (/^https?:/i.test(path)) {
     return path;
   }
-  const base = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
   const clean = path.replace(/^\/+/, '');
-  const rel = clean.startsWith('uploads/') ? clean : `uploads/${clean}`;
-  return `${base}/${rel}`;
+  if (clean.startsWith('uploads/')) {
+    const base = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+    return `${base}/${clean}`;
+  }
+  // Fallback untuk data foto lama yang tersimpan di Cloudinary
+  return `https://res.cloudinary.com/mratyocs/image/upload/${clean}`;
 };
